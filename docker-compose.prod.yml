@@ -17,7 +17,6 @@ services:
     volumes:
       - mongodb_data_prod:/data/db
       - mongodb_config_prod:/data/configdb
-      - ./deployments/docker/mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro
     networks:
       - tennex-network
     secrets:

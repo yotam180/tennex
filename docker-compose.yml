@@ -16,7 +16,6 @@ services:
       MONGO_INITDB_DATABASE: tennex
     volumes:
       - mongodb_data:/data/db
-      - ./deployments/docker/mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro
     networks:
       - tennex-network
 
