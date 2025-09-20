@@ -5,11 +5,18 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
+	"path/filepath"
 	"sync"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/gorilla/mux"
 	"go.uber.org/zap"
+
+	"go.mau.fi/whatsmeow"
+	"go.mau.fi/whatsmeow/store/sqlstore"
+	waLog "go.mau.fi/whatsmeow/util/log"
 
 	"github.com/tennex/bridge/internal/manager"
 )
@@ -121,6 +128,9 @@ func (s *Server) setupRoutes(enablePprof, enableMetrics bool) {
 		s.router.HandleFunc("/connect-client", s.handleConnectClient).Methods("POST")
 	}
 
+	// Minimal QR/connect endpoint (stateless, direct whatsmeow usage)
+	s.router.HandleFunc("/connect-minimal", s.handleConnectMinimal).Methods("POST")
+
 	// Debug endpoints
 	s.router.HandleFunc("/debug/config", s.handleDebugConfig).Methods("GET")
 	s.router.HandleFunc("/debug/whatsapp", s.handleDebugWhatsApp).Methods("GET")
@@ -196,6 +206,110 @@ func (s *Server) handleStats(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(s.stats)
+}
+
+// handleConnectMinimal: accepts {"client_id": "..."}, creates a local whatsmeow client with
+// a per-client sqlite store under /app/sessions-min/<client_id>, starts QR, returns the QR code,
+// and logs token/JID on success. Minimal PoC-style; no DB writes.
+type connectMinimalRequest struct {
+	ClientID string `json:"client_id"`
+}
+
+type connectMinimalResponse struct {
+	SessionID string `json:"session_id"`
+	QRCode    string `json:"qr_code"`
+	Status    string `json:"status"`
+	ExpiresAt string `json:"expires_at"`
+}
+
+func (s *Server) handleConnectMinimal(w http.ResponseWriter, r *http.Request) {
+	var req connectMinimalRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.ClientID == "" {
+		http.Error(w, "Invalid JSON request: client_id required", http.StatusBadRequest)
+		return
+	}
+
+	// Prepare per-client session dir under /app/sessions-min
+	base := "/app/sessions-min"
+	if v := os.Getenv("TENNEX_BRIDGE_WHATSAPP_SESSION_PATH"); v != "" {
+		base = filepath.Join(v, "..", "sessions-min")
+	}
+	if err := os.MkdirAll(base, 0755); err != nil {
+		http.Error(w, fmt.Sprintf("Failed to create base dir: %v", err), http.StatusInternalServerError)
+		return
+	}
+	sessDir := filepath.Join(base, fmt.Sprintf("client_%s", req.ClientID))
+	if err := os.MkdirAll(sessDir, 0755); err != nil {
+		http.Error(w, fmt.Sprintf("Failed to create session dir: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	// Create sqlite store and whatsmeow client
+	container, err := sqlstore.New(r.Context(), "sqlite3", fmt.Sprintf("file:%s/session.db?_foreign_keys=on", sessDir), waLog.Noop)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Failed to create store: %v", err), http.StatusInternalServerError)
+		return
+	}
+	device, err := container.GetFirstDevice(r.Context())
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Failed to get device: %v", err), http.StatusInternalServerError)
+		return
+	}
+	client := whatsmeow.NewClient(device, nil)
+
+	// Get QR channel and connect
+	qrChan, err := client.GetQRChannel(r.Context())
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Failed to get QR channel: %v", err), http.StatusInternalServerError)
+		return
+	}
+	if err := client.Connect(); err != nil {
+		http.Error(w, fmt.Sprintf("Failed to connect: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	// Generate session id and respond with first QR code when received
+	sessionID := uuid.New().String()
+	expiresAt := time.Now().Add(5 * time.Minute)
+
+	// Wait for first QR code event or timeout
+	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
+	defer cancel()
+
+	for {
+		select {
+		case evt := <-qrChan:
+			if evt.Event == "code" {
+				// Fire-and-forget watcher that logs success
+				go func() {
+					for e := range qrChan {
+						switch e.Event {
+						case "success":
+							jid := ""
+							if client.Store != nil && client.Store.ID != nil {
+								jid = client.Store.ID.String()
+							}
+							s.logger.Info("QR scan successful (minimal)", zap.String("jid", jid), zap.String("client_id", req.ClientID))
+							client.Disconnect()
+							return
+						case "timeout":
+							s.logger.Warn("QR expired before scan (minimal)", zap.String("client_id", req.ClientID))
+							client.Disconnect()
+							return
+						}
+					}
+				}()
+
+				resp := connectMinimalResponse{SessionID: sessionID, QRCode: evt.Code, Status: "waiting_for_scan", ExpiresAt: expiresAt.Format(time.RFC3339)}
+				w.Header().Set("Content-Type", "application/json")
+				json.NewEncoder(w).Encode(resp)
+				return
+			}
+		case <-ctx.Done():
+			http.Error(w, "Timeout waiting for QR", http.StatusGatewayTimeout)
+			return
+		}
+	}
 }
 
 // handleConnectClient handles POST /connect-client requests
