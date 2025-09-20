@@ -60,9 +60,9 @@ services:
     ports:
       - "8080:8080"
     environment:
-      # Database configuration
-      TENNEX_BRIDGE_MONGODB_URI: mongodb://admin:password123@mongodb:27017/tennex?authSource=admin
-      TENNEX_BRIDGE_MONGODB_DATABASE: tennex
+      # Database configuration  
+      TENNEX_BRIDGE_MONGODB_URI: mongodb://admin:password123@mongodb:27017/admin?authSource=admin&directConnection=true
+      TENNEX_BRIDGE_MONGODB_DATABASE: admin
       
       # Application configuration
       TENNEX_BRIDGE_HTTP_PORT: 8080

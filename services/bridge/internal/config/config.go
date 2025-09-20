@@ -14,27 +14,27 @@ type Config struct {
 	AppName    string `mapstructure:"app_name"`
 	AppVersion string `mapstructure:"app_version"`
 	LogLevel   string `mapstructure:"log_level"`
-	
+
 	// HTTP Server settings
 	HTTPPort int `mapstructure:"http_port"`
-	
+
 	// WhatsApp settings
 	WhatsApp WhatsAppConfig `mapstructure:"whatsapp"`
-	
+
 	// Database settings
 	MongoDB MongoDBConfig `mapstructure:"mongodb"`
-	
+
 	// Message Queue settings
 	NATS NATSConfig `mapstructure:"nats"`
-	
+
 	// Development settings
 	Dev DevConfig `mapstructure:"dev"`
 }
 
 type WhatsAppConfig struct {
-	SessionPath   string        `mapstructure:"session_path"`
-	DBLogLevel    string        `mapstructure:"db_log_level"`
-	HistorySync   bool          `mapstructure:"history_sync"`
+	SessionPath    string        `mapstructure:"session_path"`
+	DBLogLevel     string        `mapstructure:"db_log_level"`
+	HistorySync    bool          `mapstructure:"history_sync"`
 	ConnectTimeout time.Duration `mapstructure:"connect_timeout"`
 }
 
@@ -48,29 +48,33 @@ type NATSConfig struct {
 }
 
 type DevConfig struct {
-	EnablePprof  bool `mapstructure:"enable_pprof"`
+	EnablePprof   bool `mapstructure:"enable_pprof"`
 	EnableMetrics bool `mapstructure:"enable_metrics"`
-	QRInTerminal bool `mapstructure:"qr_in_terminal"`
+	QRInTerminal  bool `mapstructure:"qr_in_terminal"`
 }
 
 // Load loads configuration from environment variables and config files
 func Load() (*Config, error) {
 	v := viper.New()
-	
+
 	// Set defaults
 	setDefaults(v)
-	
+
 	// Environment variables
 	v.SetEnvPrefix("TENNEX_BRIDGE")
 	v.AutomaticEnv()
 	
+	// Explicitly bind nested environment variables
+	v.BindEnv("mongodb.uri", "TENNEX_BRIDGE_MONGODB_URI")
+	v.BindEnv("mongodb.database", "TENNEX_BRIDGE_MONGODB_DATABASE")
+
 	// Config file (optional)
 	v.SetConfigName("bridge")
 	v.SetConfigType("yaml")
 	v.AddConfigPath(".")
 	v.AddConfigPath("./config")
 	v.AddConfigPath("/etc/tennex")
-	
+
 	// Read config file if it exists (but don't fail if there are issues)
 	if err := v.ReadInConfig(); err != nil {
 		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
@@ -78,17 +82,17 @@ func Load() (*Config, error) {
 			fmt.Printf("Warning: error reading config file: %v. Continuing with environment variables and defaults.\n", err)
 		}
 	}
-	
+
 	var cfg Config
 	if err := v.Unmarshal(&cfg); err != nil {
 		return nil, fmt.Errorf("error unmarshaling config: %w", err)
 	}
-	
+
 	// Validate configuration
 	if err := validate(&cfg); err != nil {
 		return nil, fmt.Errorf("config validation failed: %w", err)
 	}
-	
+
 	return &cfg, nil
 }
 
@@ -97,20 +101,20 @@ func setDefaults(v *viper.Viper) {
 	v.SetDefault("app_version", "0.1.0")
 	v.SetDefault("log_level", "info")
 	v.SetDefault("http_port", 8080)
-	
+
 	// WhatsApp defaults
 	v.SetDefault("whatsapp.session_path", "./session")
 	v.SetDefault("whatsapp.db_log_level", "WARN")
 	v.SetDefault("whatsapp.history_sync", false)
 	v.SetDefault("whatsapp.connect_timeout", "30s")
-	
-	// MongoDB defaults
-	v.SetDefault("mongodb.uri", "mongodb://localhost:27017")
+
+	// MongoDB defaults - use service name for Docker networking
+	v.SetDefault("mongodb.uri", "mongodb://mongodb:27017")
 	v.SetDefault("mongodb.database", "tennex")
-	
-	// NATS defaults
-	v.SetDefault("nats.urls", []string{"nats://localhost:4222"})
-	
+
+	// NATS defaults - use service name for Docker networking
+	v.SetDefault("nats.urls", []string{"nats://nats:4222"})
+
 	// Dev defaults
 	v.SetDefault("dev.enable_pprof", false)
 	v.SetDefault("dev.enable_metrics", true)
@@ -121,19 +125,19 @@ func validate(cfg *Config) error {
 	if cfg.HTTPPort < 1 || cfg.HTTPPort > 65535 {
 		return fmt.Errorf("invalid http_port: %d", cfg.HTTPPort)
 	}
-	
+
 	if cfg.MongoDB.URI == "" {
 		return fmt.Errorf("mongodb.uri is required")
 	}
-	
+
 	if cfg.MongoDB.Database == "" {
 		return fmt.Errorf("mongodb.database is required")
 	}
-	
+
 	if len(cfg.NATS.URLs) == 0 {
 		return fmt.Errorf("nats.urls cannot be empty")
 	}
-	
+
 	// Validate log level
 	switch cfg.LogLevel {
 	case "debug", "info", "warn", "error", "fatal":
@@ -141,7 +145,7 @@ func validate(cfg *Config) error {
 	default:
 		return fmt.Errorf("invalid log_level: %s", cfg.LogLevel)
 	}
-	
+
 	return nil
 }
 

@@ -143,7 +143,7 @@ if [ "$HTTP_STATUS" -eq 200 ]; then
         if command -v qrencode >/dev/null 2>&1; then
             log_info "Scan this QR code with WhatsApp:"
             echo
-            qrencode -t ansiutf8 "$QR_CODE"
+            qrencode -t ansiutf8 -s 3 -m 1 -l L "$QR_CODE"
             echo
             log_info "Instructions:"
             log_info "1. Open WhatsApp on your phone"

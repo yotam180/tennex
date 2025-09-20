@@ -90,10 +90,21 @@ display_qr() {
     if [ "$QR_TOOL" = "qrencode" ]; then
         log_header "SCAN THIS QR CODE WITH WHATSAPP"
         echo
-        qrencode -t ansiutf8 "$qr_data"
+        log_info "${CYAN}Optimized QR code size for WhatsApp scanning:${NC}"
         echo
-        log_info "${CYAN}Scan the QR code above with your WhatsApp mobile app${NC}"
-        log_info "${CYAN}Go to WhatsApp > Settings > Linked Devices > Link a Device${NC}"
+        # Generate smaller, WhatsApp-friendly QR code
+        # -s 3: module size 3 (smaller than default)
+        # -m 1: margin of 1 module (smaller border)
+        # -l L: Low error correction (smaller code)
+        qrencode -t ansiutf8 -s 3 -m 1 -l L "$qr_data"
+        echo
+        log_info "${CYAN}📱 Scan with WhatsApp mobile app:${NC}"
+        log_info "   1. Open WhatsApp"
+        log_info "   2. Settings → Linked Devices"  
+        log_info "   3. Link a Device → Scan QR"
+        log_info "   4. Point camera at the QR code above"
+        echo
+        log_info "${YELLOW}💡 Tip: If QR is still too big, adjust your terminal font size${NC}"
     else
         log_header "QR CODE DATA (Install qrencode for visual display)"
         echo

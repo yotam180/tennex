@@ -131,7 +131,7 @@ if command -v qrencode >/dev/null 2>&1; then
     log_info "Test 5: QR code generation test..."
     echo
     log_info "Sample QR code (test data):"
-    qrencode -t ansiutf8 "TEST:This is a test QR code for Tennex"
+    qrencode -t ansiutf8 -s 3 -m 1 -l L "TEST:This is a test QR code for Tennex"
     echo
     log_success "QR code generation works!"
 else

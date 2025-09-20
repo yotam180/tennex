@@ -3,6 +3,7 @@ package storage
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"go.mongodb.org/mongo-driver/bson"
@@ -113,6 +114,16 @@ func (m *MongoDB) GetClientSession(ctx context.Context, sessionID string) (*Clie
 		if err == mongo.ErrNoDocuments {
 			return nil, fmt.Errorf("session not found: %s", sessionID)
 		}
+		
+		// Check for permission errors
+		if strings.Contains(strings.ToLower(err.Error()), "unauthorized") || 
+		   strings.Contains(strings.ToLower(err.Error()), "not authorized") {
+			m.logger.Error("Database permission issue during session lookup", 
+				zap.String("session_id", sessionID),
+				zap.Error(err))
+			return nil, fmt.Errorf("database permission error - check MongoDB user permissions: %w", err)
+		}
+		
 		return nil, fmt.Errorf("failed to get client session: %w", err)
 	}
 
@@ -269,11 +280,24 @@ func (m *MongoDB) createIndexes(ctx context.Context) error {
 		},
 	}
 
+	m.logger.Debug("Attempting to create MongoDB indexes...")
+	
 	_, err := collection.Indexes().CreateMany(ctx, indexes)
 	if err != nil {
+		// Check if it's an authorization error
+		if strings.Contains(strings.ToLower(err.Error()), "unauthorized") || 
+		   strings.Contains(strings.ToLower(err.Error()), "not authorized") {
+			m.logger.Warn("Cannot create indexes due to insufficient permissions - continuing without indexes",
+				zap.Error(err))
+			m.logger.Info("Note: Database performance may be suboptimal without indexes")
+			return nil // Don't fail startup due to permission issues
+		}
+		
+		// For other errors, still fail
+		m.logger.Error("Failed to create indexes", zap.Error(err))
 		return fmt.Errorf("failed to create indexes: %w", err)
 	}
 
-	m.logger.Debug("Created MongoDB indexes")
+	m.logger.Info("Successfully created MongoDB indexes")
 	return nil
 }

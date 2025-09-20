@@ -23,7 +23,7 @@ ARG BUILD_TIME
 ARG GIT_COMMIT
 RUN CGO_ENABLED=1 GOOS=linux go build \
     -a -installsuffix cgo \
-    -ldflags "-X 'main.Version=${VERSION}' -X 'main.BuildTime=${BUILD_TIME}' -X 'main.GitCommit=${GIT_COMMIT}' -s -w" \
+    -ldflags "-X main.Version=dev -X main.BuildTime=docker-build -X main.GitCommit=dev -s -w" \
     -o bridge ./cmd/bridge
 
 # Runtime stage

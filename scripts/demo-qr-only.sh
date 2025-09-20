@@ -46,7 +46,7 @@ if command -v qrencode >/dev/null 2>&1; then
     echo
     echo -e "${GREEN}Scan this QR code with WhatsApp:${NC}"
     echo
-    qrencode -t ansiutf8 "$SAMPLE_QR"
+    qrencode -t ansiutf8 -s 3 -m 1 -l L "$SAMPLE_QR"
     echo
     
     log_info "${CYAN}Instructions for WhatsApp:${NC}"

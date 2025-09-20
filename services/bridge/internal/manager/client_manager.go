@@ -20,21 +20,21 @@ import (
 
 // ClientManager manages multiple WhatsApp client connections
 type ClientManager struct {
-	storage    *storage.MongoDB
-	logger     *zap.Logger
+	storage      *storage.MongoDB
+	logger       *zap.Logger
 	eventHandler whatsapp.EventHandler
-	
+
 	// Client management
 	clients    map[string]*ManagedClient // sessionID -> client
 	clientsMux sync.RWMutex
-	
+
 	// Configuration
 	sessionPath string
 	dbLogger    waLog.Logger
-	
+
 	// Background tasks
-	stopChan   chan struct{}
-	wg         sync.WaitGroup
+	stopChan chan struct{}
+	wg       sync.WaitGroup
 }
 
 // ManagedClient wraps a WhatsApp client with session management
@@ -46,7 +46,7 @@ type ManagedClient struct {
 	Connected    bool
 	QRChannel    chan whatsmeow.QRChannelItem
 	LastActivity time.Time
-	
+
 	// Synchronization
 	mu sync.RWMutex
 }
@@ -171,12 +171,12 @@ func (cm *ClientManager) ConnectClient(ctx context.Context, req ConnectClientReq
 func (cm *ClientManager) createWhatsAppClient(ctx context.Context, sessionID, clientID string) (*ManagedClient, error) {
 	// Create session directory for this client
 	clientSessionPath := filepath.Join(cm.sessionPath, fmt.Sprintf("client_%s", clientID))
-	
+
 	// Create SQLite container for this client
 	container, err := sqlstore.New(
-		ctx, 
-		"sqlite3", 
-		fmt.Sprintf("file:%s/session.db?_foreign_keys=on", clientSessionPath), 
+		ctx,
+		"sqlite3",
+		fmt.Sprintf("file:%s/session.db?_foreign_keys=on", clientSessionPath),
 		cm.dbLogger,
 	)
 	if err != nil {
@@ -224,27 +224,49 @@ func (cm *ClientManager) getQRCode(ctx context.Context, managedClient *ManagedCl
 		return "", fmt.Errorf("failed to connect for QR: %w", err)
 	}
 
-	// Wait for QR code with timeout
+	cm.logger.Debug("Waiting for QR code from whatsmeow...",
+		zap.String("session_id", managedClient.SessionID),
+		zap.String("client_id", managedClient.ClientID))
+
+	// Wait for QR code with timeout - use proper whatsmeow pattern
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 
-	select {
-	case evt := <-qrChan:
-		switch evt.Event {
-		case "code":
-			// For now, return the raw QR string
-			// In the future, we could generate a QR code image
-			return evt.Code, nil
-		case "timeout":
-			return "", fmt.Errorf("QR code generation timeout")
-		case "success":
-			// Already connected, shouldn't happen in this flow
-			return "", fmt.Errorf("unexpected immediate connection")
-		default:
-			return "", fmt.Errorf("unexpected QR event: %s", evt.Event)
+	// Process QR channel events in a loop (like the original whatsapp client)
+	for {
+		select {
+		case evt := <-qrChan:
+			cm.logger.Debug("Received QR event",
+				zap.String("event", evt.Event),
+				zap.String("session_id", managedClient.SessionID))
+
+			switch evt.Event {
+			case "code":
+				// Return the QR code data immediately
+				cm.logger.Info("QR code generated",
+					zap.String("session_id", managedClient.SessionID),
+					zap.String("code_length", fmt.Sprintf("%d", len(evt.Code))))
+				return evt.Code, nil
+			case "timeout":
+				cm.logger.Warn("QR code timeout", zap.String("session_id", managedClient.SessionID))
+				return "", fmt.Errorf("QR code generation timeout")
+			case "success":
+				// This shouldn't happen in this flow since we return on "code"
+				// But if it does, it means immediate connection
+				cm.logger.Info("Immediate connection success", zap.String("session_id", managedClient.SessionID))
+				return "", fmt.Errorf("client connected immediately, no QR needed")
+			default:
+				cm.logger.Debug("Unknown QR event",
+					zap.String("event", evt.Event),
+					zap.String("session_id", managedClient.SessionID))
+				// Continue waiting for the "code" event
+			}
+		case <-ctx.Done():
+			cm.logger.Error("Timeout waiting for QR code",
+				zap.String("session_id", managedClient.SessionID),
+				zap.Error(ctx.Err()))
+			return "", fmt.Errorf("timeout waiting for QR code: %w", ctx.Err())
 		}
-	case <-ctx.Done():
-		return "", fmt.Errorf("timeout waiting for QR code")
 	}
 }
 
@@ -258,15 +280,15 @@ func (cm *ClientManager) handleWhatsAppEvent(managedClient *ManagedClient, evt i
 	case *waEvents.Connected:
 		cm.handleClientConnected(managedClient)
 		cm.eventHandler.HandleConnected(v)
-		
+
 	case *waEvents.Disconnected:
 		cm.handleClientDisconnected(managedClient)
 		cm.eventHandler.HandleDisconnected(v)
-		
+
 	case *waEvents.LoggedOut:
 		cm.handleClientLoggedOut(managedClient)
 		cm.eventHandler.HandleLoggedOut(v)
-		
+
 	default:
 		// Forward other events to the event handler
 		// The event handler will need to be enhanced to handle multi-client events
@@ -336,7 +358,7 @@ func (cm *ClientManager) handleClientLoggedOut(managedClient *ManagedClient) {
 	cm.logger.Warn("Client logged out from WhatsApp",
 		zap.String("client_id", managedClient.ClientID),
 		zap.String("session_id", managedClient.SessionID))
-	
+
 	// Clean up this client
 	cm.cleanupClient(managedClient.SessionID)
 }
@@ -372,7 +394,7 @@ func (cm *ClientManager) cleanupClient(sessionID string) {
 // backgroundCleanup runs background maintenance tasks
 func (cm *ClientManager) backgroundCleanup() {
 	defer cm.wg.Done()
-	
+
 	ticker := time.NewTicker(1 * time.Minute)
 	defer ticker.Stop()
 
@@ -398,7 +420,7 @@ func (cm *ClientManager) performCleanup() {
 	// Clean up expired in-memory clients
 	cm.clientsMux.Lock()
 	var toCleanup []string
-	
+
 	for sessionID, client := range cm.clients {
 		client.mu.RLock()
 		lastActivity := client.LastActivity
