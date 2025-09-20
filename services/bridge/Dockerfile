@@ -4,8 +4,8 @@
 # Build stage
 FROM golang:1.24-alpine AS builder
 
-# Install build dependencies
-RUN apk add --no-cache git ca-certificates tzdata
+# Install build dependencies including C compiler for CGO
+RUN apk add --no-cache git ca-certificates tzdata gcc musl-dev
 
 # Set working directory
 WORKDIR /build
@@ -42,7 +42,7 @@ WORKDIR /app
 # Copy binary from builder stage
 COPY --from=builder /build/bridge .
 
-# Copy configuration files
+# Copy configuration files (optional - using env vars primarily)
 COPY config/ ./config/
 
 # Create necessary directories

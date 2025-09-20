@@ -71,10 +71,11 @@ func Load() (*Config, error) {
 	v.AddConfigPath("./config")
 	v.AddConfigPath("/etc/tennex")
 	
-	// Read config file if it exists
+	// Read config file if it exists (but don't fail if there are issues)
 	if err := v.ReadInConfig(); err != nil {
 		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
-			return nil, fmt.Errorf("error reading config file: %w", err)
+			// Log warning but continue with environment variables and defaults
+			fmt.Printf("Warning: error reading config file: %v. Continuing with environment variables and defaults.\n", err)
 		}
 	}
 	
