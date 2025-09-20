@@ -1,0 +1,135 @@
+# Tennex Production Environment
+# Docker Compose configuration for production deployment
+
+version: '3.8'
+
+services:
+  mongodb:
+    image: mongo:7.0
+    container_name: tennex-mongodb-prod
+    restart: always
+    ports:
+      - "127.0.0.1:27017:27017"  # Bind to localhost only
+    environment:
+      MONGO_INITDB_ROOT_USERNAME_FILE: /run/secrets/mongo_root_username
+      MONGO_INITDB_ROOT_PASSWORD_FILE: /run/secrets/mongo_root_password
+      MONGO_INITDB_DATABASE: tennex
+    volumes:
+      - mongodb_data_prod:/data/db
+      - mongodb_config_prod:/data/configdb
+      - ./deployments/docker/mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro
+    networks:
+      - tennex-network
+    secrets:
+      - mongo_root_username
+      - mongo_root_password
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  nats:
+    image: nats:2.10
+    container_name: tennex-nats-prod
+    restart: always
+    ports:
+      - "127.0.0.1:4222:4222"  # Bind to localhost only
+    command: [
+      "--js", 
+      "--store_dir", "/data",
+      "--cluster_name", "tennex",
+      "--max_file_store", "1GB",
+      "--max_memory_store", "256MB"
+    ]
+    volumes:
+      - nats_data_prod:/data
+    networks:
+      - tennex-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  bridge:
+    build:
+      context: ./services/bridge
+      dockerfile: Dockerfile
+      args:
+        VERSION: ${VERSION:-latest}
+        BUILD_TIME: ${BUILD_TIME}
+        GIT_COMMIT: ${GIT_COMMIT}
+    container_name: tennex-bridge-prod
+    restart: always
+    ports:
+      - "8080:8080"
+    environment:
+      # Database configuration
+      TENNEX_BRIDGE_MONGODB_URI_FILE: /run/secrets/mongodb_uri
+      TENNEX_BRIDGE_MONGODB_DATABASE: tennex
+      
+      # Application configuration
+      TENNEX_BRIDGE_HTTP_PORT: 8080
+      TENNEX_BRIDGE_LOG_LEVEL: info
+      
+      # WhatsApp configuration
+      TENNEX_BRIDGE_WHATSAPP_SESSION_PATH: /app/sessions
+      TENNEX_BRIDGE_WHATSAPP_DB_LOG_LEVEL: ERROR
+      TENNEX_BRIDGE_WHATSAPP_HISTORY_SYNC: false
+      
+      # NATS configuration
+      TENNEX_BRIDGE_NATS_URLS: nats://nats:4222
+      
+      # Production settings
+      TENNEX_BRIDGE_DEV_ENABLE_PPROF: false
+      TENNEX_BRIDGE_DEV_ENABLE_METRICS: true
+      TENNEX_BRIDGE_DEV_QR_IN_TERMINAL: false
+      
+      # Runtime environment
+      TENNEX_ENV: production
+    volumes:
+      - bridge_sessions_prod:/app/sessions
+      - bridge_logs_prod:/app/logs
+    depends_on:
+      - mongodb
+      - nats
+    networks:
+      - tennex-network
+    secrets:
+      - mongodb_uri
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+volumes:
+  mongodb_data_prod:
+    driver: local
+  mongodb_config_prod:
+    driver: local
+  nats_data_prod:
+    driver: local
+  bridge_sessions_prod:
+    driver: local
+  bridge_logs_prod:
+    driver: local
+
+networks:
+  tennex-network:
+    driver: bridge
+
+secrets:
+  mongo_root_username:
+    file: ./secrets/mongo_root_username.txt
+  mongo_root_password:
+    file: ./secrets/mongo_root_password.txt
+  mongodb_uri:
+    file: ./secrets/mongodb_uri.txt

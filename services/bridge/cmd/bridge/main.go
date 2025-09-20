@@ -14,8 +14,10 @@ import (
 	"github.com/tennex/bridge/internal/config"
 	"github.com/tennex/bridge/internal/events"
 	"github.com/tennex/bridge/internal/logging"
+	"github.com/tennex/bridge/internal/manager"
 	"github.com/tennex/bridge/internal/publisher"
 	"github.com/tennex/bridge/internal/server"
+	"github.com/tennex/bridge/internal/storage"
 	"github.com/tennex/bridge/internal/whatsapp"
 )
 
@@ -83,6 +85,18 @@ func run(ctx context.Context, cfg *config.Config, logger *zap.Logger) error {
 		zap.String("account_id", accountID),
 		zap.String("device_id", deviceID))
 	
+	// Initialize MongoDB storage
+	dbLogger := logging.DatabaseLogger(logger)
+	mongodb, err := storage.NewMongoDB(ctx, storage.ConnectOptions{
+		URI:      cfg.MongoDB.URI,
+		Database: cfg.MongoDB.Database,
+		Logger:   dbLogger,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to connect to MongoDB: %w", err)
+	}
+	defer mongodb.Close(ctx)
+	
 	// Initialize event publisher (console publisher for PoC)
 	eventPublisher := publisher.NewConsolePublisher(logging.EventLogger(logger))
 	
@@ -94,18 +108,36 @@ func run(ctx context.Context, cfg *config.Config, logger *zap.Logger) error {
 		deviceID,
 	)
 	
-	// Initialize WhatsApp client
-	waLogger := logging.WhatsAppLogger(logger)
-	waClient, err := whatsapp.NewClient(whatsapp.ClientConfig{
-		SessionPath:   cfg.WhatsApp.SessionPath,
-		QRInTerminal:  cfg.Dev.QRInTerminal,
-		DBLogLevel:    cfg.WhatsApp.DBLogLevel,
-		HistorySync:   cfg.WhatsApp.HistorySync,
-		EventHandler:  eventHandler,
-		Logger:        waLogger,
+	// Initialize multi-tenant client manager
+	clientManager, err := manager.NewClientManager(manager.ClientManagerConfig{
+		Storage:      mongodb,
+		Logger:       logging.WhatsAppLogger(logger),
+		EventHandler: eventHandler,
+		SessionPath:  cfg.WhatsApp.SessionPath,
+		DBLogLevel:   cfg.WhatsApp.DBLogLevel,
 	})
 	if err != nil {
-		return fmt.Errorf("failed to create WhatsApp client: %w", err)
+		return fmt.Errorf("failed to create client manager: %w", err)
+	}
+	defer clientManager.Stop()
+	
+	// Optionally initialize legacy single WhatsApp client (for backward compatibility)
+	var waClient *whatsapp.Client
+	if cfg.Dev.QRInTerminal {
+		// Only create legacy client if QR in terminal is enabled (development mode)
+		waLogger := logging.WhatsAppLogger(logger)
+		waClient, err = whatsapp.NewClient(whatsapp.ClientConfig{
+			SessionPath:   cfg.WhatsApp.SessionPath + "/legacy",
+			QRInTerminal:  cfg.Dev.QRInTerminal,
+			DBLogLevel:    cfg.WhatsApp.DBLogLevel,
+			HistorySync:   cfg.WhatsApp.HistorySync,
+			EventHandler:  eventHandler,
+			Logger:        waLogger,
+		})
+		if err != nil {
+			logger.Warn("Failed to create legacy WhatsApp client", zap.Error(err))
+			waClient = nil
+		}
 	}
 	
 	// Initialize HTTP server
@@ -114,6 +146,7 @@ func run(ctx context.Context, cfg *config.Config, logger *zap.Logger) error {
 		Port:          cfg.HTTPPort,
 		Logger:        httpLogger,
 		WAClient:      waClient,
+		ClientManager: clientManager,
 		EnablePprof:   cfg.Dev.EnablePprof,
 		EnableMetrics: cfg.Dev.EnableMetrics,
 	})
@@ -123,20 +156,25 @@ func run(ctx context.Context, cfg *config.Config, logger *zap.Logger) error {
 		return fmt.Errorf("failed to start HTTP server: %w", err)
 	}
 	
+	endpoints := []string{"/health", "/ready", "/stats", "/connect-client", "/debug/config", "/debug/whatsapp"}
 	logger.Info("HTTP server started",
 		zap.Int("port", cfg.HTTPPort),
-		zap.Strings("endpoints", []string{"/health", "/ready", "/stats", "/debug/config", "/debug/whatsapp"}))
+		zap.Strings("endpoints", endpoints))
 	
-	// Connect to WhatsApp
-	connectCtx, connectCancel := context.WithTimeout(ctx, cfg.WhatsApp.ConnectTimeout)
-	defer connectCancel()
-	
-	logger.Info("Connecting to WhatsApp...")
-	if err := waClient.Connect(connectCtx); err != nil {
-		return fmt.Errorf("failed to connect to WhatsApp: %w", err)
+	// Optionally connect legacy WhatsApp client
+	if waClient != nil {
+		connectCtx, connectCancel := context.WithTimeout(ctx, cfg.WhatsApp.ConnectTimeout)
+		defer connectCancel()
+		
+		logger.Info("Connecting legacy WhatsApp client...")
+		if err := waClient.Connect(connectCtx); err != nil {
+			logger.Warn("Failed to connect legacy WhatsApp client", zap.Error(err))
+		} else {
+			logger.Info("Legacy WhatsApp client connected")
+		}
 	}
 	
-	logger.Info("Bridge service fully initialized and running")
+	logger.Info("Bridge service fully initialized and running (multi-tenant mode)")
 	
 	// Wait for shutdown signal
 	select {
@@ -158,8 +196,12 @@ func run(ctx context.Context, cfg *config.Config, logger *zap.Logger) error {
 		logger.Error("Error stopping HTTP server", zap.Error(err))
 	}
 	
-	// Disconnect WhatsApp client
-	waClient.Disconnect()
+	// Disconnect legacy WhatsApp client
+	if waClient != nil {
+		waClient.Disconnect()
+	}
+	
+	// Client manager will be stopped by defer
 	
 	logger.Info("Graceful shutdown completed")
 	return nil

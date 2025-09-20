@@ -10,6 +10,8 @@ import (
 
 	"github.com/gorilla/mux"
 	"go.uber.org/zap"
+	
+	"github.com/tennex/bridge/internal/manager"
 )
 
 // Server provides HTTP endpoints for health checks, metrics, and debugging
@@ -20,7 +22,8 @@ type Server struct {
 	port     int
 	
 	// Service dependencies
-	waClient WAClient
+	waClient      WAClient // Legacy single client (for backward compatibility)
+	clientManager *manager.ClientManager
 	
 	// Runtime information
 	startTime time.Time
@@ -36,17 +39,19 @@ type WAClient interface {
 
 // Stats holds runtime statistics
 type Stats struct {
-	StartTime       time.Time `json:"start_time"`
-	Uptime          string    `json:"uptime"`
-	WhatsAppConnected bool    `json:"whatsapp_connected"`
-	WhatsAppJID     string    `json:"whatsapp_jid,omitempty"`
+	StartTime         time.Time `json:"start_time"`
+	Uptime            string    `json:"uptime"`
+	WhatsAppConnected bool      `json:"whatsapp_connected"`        // Legacy single client
+	WhatsAppJID       string    `json:"whatsapp_jid,omitempty"`    // Legacy single client
+	ActiveClients     int       `json:"active_clients"`            // Multi-tenant clients
 }
 
 // Config holds server configuration
 type Config struct {
-	Port     int
-	Logger   *zap.Logger
-	WAClient WAClient
+	Port          int
+	Logger        *zap.Logger
+	WAClient      WAClient                   // Legacy single client (optional)
+	ClientManager *manager.ClientManager    // Multi-tenant client manager
 	
 	// Feature flags
 	EnablePprof  bool
@@ -56,12 +61,13 @@ type Config struct {
 // New creates a new HTTP server
 func New(cfg Config) *Server {
 	s := &Server{
-		router:    mux.NewRouter(),
-		logger:    cfg.Logger,
-		port:      cfg.Port,
-		waClient:  cfg.WAClient,
-		startTime: time.Now(),
-		stats:     &Stats{},
+		router:        mux.NewRouter(),
+		logger:        cfg.Logger,
+		port:          cfg.Port,
+		waClient:      cfg.WAClient,
+		clientManager: cfg.ClientManager,
+		startTime:     time.Now(),
+		stats:         &Stats{},
 	}
 	
 	// Setup routes
@@ -109,6 +115,11 @@ func (s *Server) setupRoutes(enablePprof, enableMetrics bool) {
 	s.router.HandleFunc("/health", s.handleHealth).Methods("GET")
 	s.router.HandleFunc("/ready", s.handleReady).Methods("GET")
 	s.router.HandleFunc("/stats", s.handleStats).Methods("GET")
+	
+	// Client management endpoints
+	if s.clientManager != nil {
+		s.router.HandleFunc("/connect-client", s.handleConnectClient).Methods("POST")
+	}
 	
 	// Debug endpoints
 	s.router.HandleFunc("/debug/config", s.handleDebugConfig).Methods("GET")
@@ -170,6 +181,7 @@ func (s *Server) handleStats(w http.ResponseWriter, r *http.Request) {
 	s.stats.StartTime = s.startTime
 	s.stats.Uptime = time.Since(s.startTime).String()
 	
+	// Legacy single client stats
 	if s.waClient != nil {
 		s.stats.WhatsAppConnected = s.waClient.IsConnected()
 		if jid := s.waClient.GetJID(); jid != nil {
@@ -177,8 +189,54 @@ func (s *Server) handleStats(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	
+	// Multi-tenant client stats
+	if s.clientManager != nil {
+		s.stats.ActiveClients = s.clientManager.GetActiveClients()
+	}
+	
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(s.stats)
+}
+
+// handleConnectClient handles POST /connect-client requests
+func (s *Server) handleConnectClient(w http.ResponseWriter, r *http.Request) {
+	if s.clientManager == nil {
+		http.Error(w, "Client manager not available", http.StatusServiceUnavailable)
+		return
+	}
+
+	var req manager.ConnectClientRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		s.logger.Error("Failed to decode connect client request", zap.Error(err))
+		http.Error(w, "Invalid JSON request", http.StatusBadRequest)
+		return
+	}
+
+	// Validate client ID
+	if req.ClientID == "" {
+		http.Error(w, "client_id is required", http.StatusBadRequest)
+		return
+	}
+
+	// Connect client
+	ctx := r.Context()
+	response, err := s.clientManager.ConnectClient(ctx, req)
+	if err != nil {
+		s.logger.Error("Failed to connect client",
+			zap.Error(err),
+			zap.String("client_id", req.ClientID))
+		
+		http.Error(w, fmt.Sprintf("Failed to connect client: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	s.logger.Info("Client connection initiated",
+		zap.String("client_id", req.ClientID),
+		zap.String("session_id", response.SessionID))
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(response)
 }
 
 // handleDebugConfig returns configuration information (with sensitive data masked)
