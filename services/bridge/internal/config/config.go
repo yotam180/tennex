@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/spf13/viper"
@@ -62,11 +63,21 @@ func Load() (*Config, error) {
 
 	// Environment variables
 	v.SetEnvPrefix("TENNEX_BRIDGE")
+	// Allow mapping nested keys (e.g., whatsapp.session_path) from env like TENNEX_BRIDGE_WHATSAPP_SESSION_PATH
+	v.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 	v.AutomaticEnv()
-	
+
 	// Explicitly bind nested environment variables
 	v.BindEnv("mongodb.uri", "TENNEX_BRIDGE_MONGODB_URI")
 	v.BindEnv("mongodb.database", "TENNEX_BRIDGE_MONGODB_DATABASE")
+	v.BindEnv("whatsapp.session_path", "TENNEX_BRIDGE_WHATSAPP_SESSION_PATH")
+	v.BindEnv("whatsapp.db_log_level", "TENNEX_BRIDGE_WHATSAPP_DB_LOG_LEVEL")
+	v.BindEnv("whatsapp.history_sync", "TENNEX_BRIDGE_WHATSAPP_HISTORY_SYNC")
+	v.BindEnv("dev.qr_in_terminal", "TENNEX_BRIDGE_DEV_QR_IN_TERMINAL")
+	v.BindEnv("dev.enable_pprof", "TENNEX_BRIDGE_DEV_ENABLE_PPROF")
+	v.BindEnv("dev.enable_metrics", "TENNEX_BRIDGE_DEV_ENABLE_METRICS")
+	v.BindEnv("log_level", "TENNEX_BRIDGE_LOG_LEVEL")
+	v.BindEnv("http_port", "TENNEX_BRIDGE_HTTP_PORT")
 
 	// Config file (optional)
 	v.SetConfigName("bridge")

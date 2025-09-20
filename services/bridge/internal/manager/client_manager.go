@@ -3,6 +3,7 @@ package manager
 import (
 	"context"
 	"fmt"
+	"os"
 	"path/filepath"
 	"sync"
 	"time"
@@ -172,6 +173,15 @@ func (cm *ClientManager) createWhatsAppClient(ctx context.Context, sessionID, cl
 	// Create session directory for this client
 	clientSessionPath := filepath.Join(cm.sessionPath, fmt.Sprintf("client_%s", clientID))
 
+	// Ensure the directory exists
+	if err := os.MkdirAll(clientSessionPath, 0755); err != nil {
+		return nil, fmt.Errorf("failed to create session directory: %w", err)
+	}
+
+	cm.logger.Debug("Created session directory",
+		zap.String("path", clientSessionPath),
+		zap.String("client_id", clientID))
+
 	// Create SQLite container for this client
 	container, err := sqlstore.New(
 		ctx,
@@ -221,6 +231,19 @@ func (cm *ClientManager) getQRCode(ctx context.Context, managedClient *ManagedCl
 	// Connect to start QR generation
 	err = managedClient.Client.Connect()
 	if err != nil {
+		// Add detailed logging and persist error on session for diagnostics
+		cm.logger.Error("Failed to connect for QR",
+			zap.String("session_id", managedClient.SessionID),
+			zap.String("client_id", managedClient.ClientID),
+			zap.Error(err))
+
+		// Best-effort persist error reason for later inspection
+		_ = cm.storage.UpdateClientSession(context.Background(), managedClient.SessionID, map[string]interface{}{
+			"status":       "error",
+			"error_reason": fmt.Sprintf("connect_error: %v", err),
+			"updated_at":   time.Now(),
+		})
+
 		return "", fmt.Errorf("failed to connect for QR: %w", err)
 	}
 
@@ -246,6 +269,43 @@ func (cm *ClientManager) getQRCode(ctx context.Context, managedClient *ManagedCl
 				cm.logger.Info("QR code generated",
 					zap.String("session_id", managedClient.SessionID),
 					zap.String("code_length", fmt.Sprintf("%d", len(evt.Code))))
+
+				// Mark session state for observability (best-effort)
+				_ = cm.storage.UpdateClientSession(context.Background(), managedClient.SessionID, map[string]interface{}{
+					"status":     "qr_code_generated",
+					"updated_at": time.Now(),
+				})
+
+				// Continue watching QR channel events in the background to log outcomes
+				go func(sessionID, clientID string, ch <-chan whatsmeow.QRChannelItem) {
+					for e := range ch {
+						switch e.Event {
+						case "success":
+							cm.logger.Info("QR code scan successful",
+								zap.String("session_id", sessionID),
+								zap.String("client_id", clientID))
+							_ = cm.storage.UpdateClientSession(context.Background(), sessionID, map[string]interface{}{
+								"status":     "scanned",
+								"updated_at": time.Now(),
+							})
+							return
+						case "timeout":
+							cm.logger.Warn("QR code expired before scan",
+								zap.String("session_id", sessionID),
+								zap.String("client_id", clientID))
+							_ = cm.storage.UpdateClientSession(context.Background(), sessionID, map[string]interface{}{
+								"status":     "qr_timeout",
+								"updated_at": time.Now(),
+							})
+							return
+						default:
+							cm.logger.Debug("QR flow event",
+								zap.String("event", e.Event),
+								zap.String("session_id", sessionID))
+						}
+					}
+				}(managedClient.SessionID, managedClient.ClientID, qrChan)
+
 				return evt.Code, nil
 			case "timeout":
 				cm.logger.Warn("QR code timeout", zap.String("session_id", managedClient.SessionID))

@@ -14,7 +14,7 @@ import (
 	"go.mau.fi/whatsmeow/types/events"
 	waLog "go.mau.fi/whatsmeow/util/log"
 	"go.uber.org/zap"
-	
+
 	// Import SQLite driver for whatsmeow session storage
 	_ "github.com/mattn/go-sqlite3"
 )
