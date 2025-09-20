@@ -1,0 +1,31 @@
+# Tennex Bridge Service Configuration
+
+# Application settings
+app_name: "tennex-bridge"
+log_level: "info"  # debug, info, warn, error, fatal
+
+# HTTP server settings
+http_port: 8080
+
+# WhatsApp client settings
+whatsapp:
+  session_path: "./session"
+  db_log_level: "WARN"  # TRACE, DEBUG, INFO, WARN, ERROR
+  history_sync: false
+  connect_timeout: "30s"
+
+# MongoDB settings (for future use)
+mongodb:
+  uri: "mongodb://localhost:27017"
+  database: "tennex"
+
+# NATS settings (for future use)
+nats:
+  urls:
+    - "nats://localhost:4222"
+
+# Development settings
+dev:
+  enable_pprof: true    # Enable pprof debugging endpoints
+  enable_metrics: true  # Enable Prometheus metrics
+  qr_in_terminal: true  # Display QR code in terminal for authentication
