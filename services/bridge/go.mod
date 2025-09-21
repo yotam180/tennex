@@ -7,6 +7,7 @@ toolchain go1.24.6
 require (
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/mux v1.8.1
+	github.com/mattn/go-sqlite3 v1.14.32
 	github.com/spf13/viper v1.18.2
 	go.mau.fi/whatsmeow v0.0.0-20250919124702-c8bdfd36d05e
 	go.uber.org/zap v1.26.0
