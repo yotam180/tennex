@@ -22,12 +22,6 @@ type Config struct {
 	// WhatsApp settings
 	WhatsApp WhatsAppConfig `mapstructure:"whatsapp"`
 
-	// Database settings
-	MongoDB MongoDBConfig `mapstructure:"mongodb"`
-
-	// Message Queue settings
-	NATS NATSConfig `mapstructure:"nats"`
-
 	// Development settings
 	Dev DevConfig `mapstructure:"dev"`
 }
@@ -37,15 +31,6 @@ type WhatsAppConfig struct {
 	DBLogLevel     string        `mapstructure:"db_log_level"`
 	HistorySync    bool          `mapstructure:"history_sync"`
 	ConnectTimeout time.Duration `mapstructure:"connect_timeout"`
-}
-
-type MongoDBConfig struct {
-	URI      string `mapstructure:"uri"`
-	Database string `mapstructure:"database"`
-}
-
-type NATSConfig struct {
-	URLs []string `mapstructure:"urls"`
 }
 
 type DevConfig struct {
@@ -68,8 +53,6 @@ func Load() (*Config, error) {
 	v.AutomaticEnv()
 
 	// Explicitly bind nested environment variables
-	v.BindEnv("mongodb.uri", "TENNEX_BRIDGE_MONGODB_URI")
-	v.BindEnv("mongodb.database", "TENNEX_BRIDGE_MONGODB_DATABASE")
 	v.BindEnv("whatsapp.session_path", "TENNEX_BRIDGE_WHATSAPP_SESSION_PATH")
 	v.BindEnv("whatsapp.db_log_level", "TENNEX_BRIDGE_WHATSAPP_DB_LOG_LEVEL")
 	v.BindEnv("whatsapp.history_sync", "TENNEX_BRIDGE_WHATSAPP_HISTORY_SYNC")
@@ -119,13 +102,6 @@ func setDefaults(v *viper.Viper) {
 	v.SetDefault("whatsapp.history_sync", false)
 	v.SetDefault("whatsapp.connect_timeout", "30s")
 
-	// MongoDB defaults - use service name for Docker networking
-	v.SetDefault("mongodb.uri", "mongodb://mongodb:27017")
-	v.SetDefault("mongodb.database", "tennex")
-
-	// NATS defaults - use service name for Docker networking
-	v.SetDefault("nats.urls", []string{"nats://nats:4222"})
-
 	// Dev defaults
 	v.SetDefault("dev.enable_pprof", false)
 	v.SetDefault("dev.enable_metrics", true)
@@ -135,18 +111,6 @@ func setDefaults(v *viper.Viper) {
 func validate(cfg *Config) error {
 	if cfg.HTTPPort < 1 || cfg.HTTPPort > 65535 {
 		return fmt.Errorf("invalid http_port: %d", cfg.HTTPPort)
-	}
-
-	if cfg.MongoDB.URI == "" {
-		return fmt.Errorf("mongodb.uri is required")
-	}
-
-	if cfg.MongoDB.Database == "" {
-		return fmt.Errorf("mongodb.database is required")
-	}
-
-	if len(cfg.NATS.URLs) == 0 {
-		return fmt.Errorf("nats.urls cannot be empty")
 	}
 
 	// Validate log level
@@ -169,8 +133,6 @@ func (c *Config) LogConfig(logger *zap.Logger) {
 		zap.Int("http_port", c.HTTPPort),
 		zap.String("session_path", c.WhatsApp.SessionPath),
 		zap.Bool("history_sync", c.WhatsApp.HistorySync),
-		zap.String("mongodb_database", c.MongoDB.Database),
-		zap.Strings("nats_urls", c.NATS.URLs),
 		zap.Bool("dev_mode", c.Dev.EnablePprof || c.Dev.QRInTerminal),
 	)
 }

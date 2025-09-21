@@ -14,16 +14,6 @@ whatsapp:
   history_sync: false
   connect_timeout: "30s"
 
-# MongoDB settings (for future use)
-mongodb:
-  uri: "mongodb://localhost:27017"
-  database: "tennex"
-
-# NATS settings (for future use)
-nats:
-  urls:
-    - "nats://localhost:4222"
-
 # Development settings
 dev:
   enable_pprof: true    # Enable pprof debugging endpoints

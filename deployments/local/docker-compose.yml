@@ -2,65 +2,16 @@
 # Docker Compose configuration for local development
 
 services:
-  mongodb:
-    image: mongo:7.0
-    container_name: tennex-mongodb
-    restart: unless-stopped
-    ports:
-      - "27017:27017"
-    environment:
-      MONGO_INITDB_ROOT_USERNAME: admin
-      MONGO_INITDB_ROOT_PASSWORD: password123
-      MONGO_INITDB_DATABASE: tennex
-    volumes:
-      - mongodb_data:/data/db
-    networks:
-      - tennex-network
-
-  # MongoDB Admin UI (optional)
-  mongo-express:
-    image: mongo-express:1.0.2
-    container_name: tennex-mongo-express
-    restart: unless-stopped
-    ports:
-      - "8081:8081"
-    environment:
-      ME_CONFIG_MONGODB_ADMINUSERNAME: admin
-      ME_CONFIG_MONGODB_ADMINPASSWORD: password123
-      ME_CONFIG_MONGODB_URL: mongodb://admin:password123@mongodb:27017/
-      ME_CONFIG_BASICAUTH_USERNAME: admin
-      ME_CONFIG_BASICAUTH_PASSWORD: admin123
-    depends_on:
-      - mongodb
-    networks:
-      - tennex-network
-
-  # NATS Message Queue (for future use)
-  nats:
-    image: nats:2.10
-    container_name: tennex-nats
-    restart: unless-stopped
-    ports:
-      - "4222:4222"  # Client connections
-      - "8222:8222"  # HTTP management
-    command: ["--js", "--http_port", "8222"]
-    networks:
-      - tennex-network
-
   # Bridge Service
   bridge:
     build:
-      context: ./services/bridge
+      context: ../../services/bridge
       dockerfile: Dockerfile
     container_name: tennex-bridge
     restart: unless-stopped
     ports:
       - "8080:8080"
     environment:
-      # Database configuration  
-      TENNEX_BRIDGE_MONGODB_URI: mongodb://admin:password123@mongodb:27017/admin?authSource=admin&directConnection=true
-      TENNEX_BRIDGE_MONGODB_DATABASE: admin
-      
       # Application configuration
       TENNEX_BRIDGE_HTTP_PORT: 8080
       TENNEX_BRIDGE_LOG_LEVEL: debug
@@ -69,9 +20,6 @@ services:
       TENNEX_BRIDGE_WHATSAPP_SESSION_PATH: /app/sessions
       TENNEX_BRIDGE_WHATSAPP_DB_LOG_LEVEL: INFO
       TENNEX_BRIDGE_WHATSAPP_HISTORY_SYNC: false
-      
-      # NATS configuration
-      TENNEX_BRIDGE_NATS_URLS: nats://nats:4222
       
       # Development settings
       TENNEX_BRIDGE_DEV_ENABLE_PPROF: true
@@ -83,11 +31,6 @@ services:
     volumes:
       - bridge_sessions:/app/sessions
       - bridge_logs:/app/logs
-    depends_on:
-      - mongodb
-      - nats
-    networks:
-      - tennex-network
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
       interval: 30s
@@ -96,16 +39,7 @@ services:
       start_period: 40s
 
 volumes:
-  mongodb_data:
-    driver: local
   bridge_sessions:
     driver: local
   bridge_logs:
     driver: local
-
-networks:
-  tennex-network:
-    driver: bridge
-    ipam:
-      config:
-        - subnet: 172.25.0.0/16

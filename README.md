@@ -1,35 +1,68 @@
-# Tennex - WhatsApp Bridge & Management System
+# Tennex - WhatsApp Bridge System
 
-A comprehensive system for WhatsApp automation and management with event-sourced architecture.
+A minimal WhatsApp bridge service for QR-based authentication and session management.
 
-## Architecture Overview
+## Current Status
 
-- **Bridge Service**: WhatsApp connectivity via whatsmeow (Go)
-- **Event Store API**: Durable event storage with cursor-based sync (Go) 
-- **Management API**: OAuth, access control, scheduling (Go)
-- **Client App**: Local-first UI with offline support (TypeScript/Electron)
+This is a simplified, working WhatsApp bridge that:
+- Generates QR codes for WhatsApp authentication
+- Provides HTTP API for basic operations
+- Uses Docker for development with live reload
 
 ## Project Structure
 
 ```
 tennex/
-├── services/           # Backend services
-│   ├── bridge/         # WhatsApp bridge (whatsmeow)
-│   ├── event-store/    # Event storage & sync API
-│   └── management/     # Management & auth API
-├── client/             # Client application
-├── shared/             # Shared schemas & protocols
-├── deployments/        # Docker & deployment configs
-├── scripts/            # Development scripts
-├── docs/              # Documentation
-└── tools/             # Development tools
+├── services/bridge/        # WhatsApp bridge service (Go)
+├── deployments/local/      # Local development Docker setup
+├── scripts/               # Development shell shortcuts
+└── test/                  # Minimal whatsmeow PoC
 ```
 
-## Getting Started
+## Quick Start
 
-1. Start with the bridge service: `cd services/bridge`
-2. Run with Docker Compose: `docker-compose up -d`
+1. **Start development environment:**
+   ```bash
+   # Source shell shortcuts
+   . scripts/shell_shortcuts.sh
+   
+   # Start with live reload
+   txdev
+   ```
+
+2. **Test QR generation:**
+   ```bash
+   # Generate QR and get session
+   txconnect my-client
+   ```
+
+3. **Check health:**
+   ```bash
+   txhealth
+   ```
 
 ## Development
 
-See individual service README files for specific development instructions.
+- `txdev` - Start development environment with live reload
+- `txup` - Start services
+- `txdown` - Stop services  
+- `txl` - View logs
+- `txconnect <client>` - Test QR generation
+- `txhelp` - Show all shortcuts
+
+## API Endpoints
+
+- `GET /health` - Health check
+- `GET /ready` - Readiness check  
+- `GET /stats` - Runtime stats
+- `POST /connect-minimal` - Generate QR for client
+- `GET /debug/config` - Configuration info
+
+## Architecture
+
+The bridge service is intentionally minimal:
+- Single HTTP server with essential endpoints
+- QR generation via whatsmeow library
+- Session management with SQLite
+- Live reload development with Air
+- Docker-based deployment
