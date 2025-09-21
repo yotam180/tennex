@@ -77,8 +77,6 @@ func run(ctx context.Context, cfg *config.Config, logger *zap.Logger) error {
 	httpServer := server.New(server.Config{
 		Port:          cfg.HTTPPort,
 		Logger:        httpLogger,
-		WAClient:      nil,
-		ClientManager: nil,
 		EnablePprof:   cfg.Dev.EnablePprof,
 		EnableMetrics: cfg.Dev.EnableMetrics,
 	})
