@@ -8,9 +8,9 @@ tmp_dir = "tmp"
 [build]
   args_bin = []
   bin = "./tmp/main"
-  cmd = "go build -ldflags '-X main.Version=dev -X \"main.BuildTime=$(date -u '+%Y-%m-%d %H:%M:%S UTC')\" -X main.GitCommit=dev' -o ./tmp/main ./cmd/bridge"
+  cmd = "go build -ldflags '-X main.Version=dev -X main.BuildTime=dev -X main.GitCommit=dev' -o ./tmp/main ./cmd/bridge"
   delay = 1000
-  exclude_dir = ["assets", "tmp", "vendor", "testdata", "build", "session"]
+  exclude_dir = ["assets", "tmp", "vendor", "testdata", "build", "sessions"]
   exclude_file = []
   exclude_regex = ["_test.go"]
   exclude_unchanged = false

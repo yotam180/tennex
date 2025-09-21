@@ -140,6 +140,15 @@ function txsh() {
     txx bridge sh
 }
 
+# [txdev] - tennex development - start development environment with live reload
+function txdev() {
+    (
+        cd $TENNX_ROOT_DIR/deployments/local
+        echo "Starting development environment with live reload..."
+        docker compose up -d
+    )
+}
+
 # --- API helpers ---
 txhealth() { curl -s "$BRIDGE_URL/health" | jq .; }
 txready() { curl -s "$BRIDGE_URL/ready" | jq .; }
@@ -175,6 +184,7 @@ txhelp() {
 Tennex shortcuts loaded. Examples:
   tx                    # navigate to project root
   txup [svc]            # docker compose up -d
+  txdev                 # start development environment with live reload
   txdown                # docker compose down
   txb [svc]             # docker compose build
   txbrl [svc]           # build, run, logs
