@@ -17,8 +17,6 @@ import (
 	"go.mau.fi/whatsmeow"
 	"go.mau.fi/whatsmeow/store/sqlstore"
 	waLog "go.mau.fi/whatsmeow/util/log"
-
-	"github.com/tennex/bridge/internal/manager"
 )
 
 // Server provides HTTP endpoints for health checks, metrics, and debugging
@@ -28,37 +26,22 @@ type Server struct {
 	logger *zap.Logger
 	port   int
 
-	// Service dependencies
-	waClient      WAClient // Legacy single client (for backward compatibility)
-	clientManager *manager.ClientManager
-
 	// Runtime information
 	startTime time.Time
 	mu        sync.RWMutex
 	stats     *Stats
 }
 
-// WAClient interface for WhatsApp client operations
-type WAClient interface {
-	IsConnected() bool
-	GetJID() interface{} // Will handle types.JID conversion internally
-}
-
 // Stats holds runtime statistics
 type Stats struct {
-	StartTime         time.Time `json:"start_time"`
-	Uptime            string    `json:"uptime"`
-	WhatsAppConnected bool      `json:"whatsapp_connected"`     // Legacy single client
-	WhatsAppJID       string    `json:"whatsapp_jid,omitempty"` // Legacy single client
-	ActiveClients     int       `json:"active_clients"`         // Multi-tenant clients
+	StartTime time.Time `json:"start_time"`
+	Uptime    string    `json:"uptime"`
 }
 
 // Config holds server configuration
 type Config struct {
-	Port          int
-	Logger        *zap.Logger
-	WAClient      WAClient               // Legacy single client (optional)
-	ClientManager *manager.ClientManager // Multi-tenant client manager
+	Port   int
+	Logger *zap.Logger
 
 	// Feature flags
 	EnablePprof   bool
@@ -68,13 +51,11 @@ type Config struct {
 // New creates a new HTTP server
 func New(cfg Config) *Server {
 	s := &Server{
-		router:        mux.NewRouter(),
-		logger:        cfg.Logger,
-		port:          cfg.Port,
-		waClient:      cfg.WAClient,
-		clientManager: cfg.ClientManager,
-		startTime:     time.Now(),
-		stats:         &Stats{},
+		router:    mux.NewRouter(),
+		logger:    cfg.Logger,
+		port:      cfg.Port,
+		startTime: time.Now(),
+		stats:     &Stats{},
 	}
 
 	// Setup routes
@@ -123,10 +104,6 @@ func (s *Server) setupRoutes(enablePprof, enableMetrics bool) {
 	s.router.HandleFunc("/ready", s.handleReady).Methods("GET")
 	s.router.HandleFunc("/stats", s.handleStats).Methods("GET")
 
-	// Client management endpoints
-	if s.clientManager != nil {
-		s.router.HandleFunc("/connect-client", s.handleConnectClient).Methods("POST")
-	}
 
 	// Minimal QR/connect endpoint (stateless, direct whatsmeow usage)
 	s.router.HandleFunc("/connect-minimal", s.handleConnectMinimal).Methods("POST")
@@ -162,24 +139,15 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(response)
 }
 
-// handleReady returns readiness status (includes WhatsApp connection)
+// handleReady returns readiness status
 func (s *Server) handleReady(w http.ResponseWriter, r *http.Request) {
-	connected := s.waClient != nil && s.waClient.IsConnected()
-
 	response := map[string]interface{}{
-		"status":             "ready",
-		"timestamp":          time.Now(),
-		"whatsapp_connected": connected,
-	}
-
-	status := http.StatusOK
-	if !connected {
-		response["status"] = "not_ready"
-		status = http.StatusServiceUnavailable
+		"status":    "ready",
+		"timestamp": time.Now(),
+		"uptime":    time.Since(s.startTime).String(),
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
 	json.NewEncoder(w).Encode(response)
 }
 
@@ -190,19 +158,6 @@ func (s *Server) handleStats(w http.ResponseWriter, r *http.Request) {
 
 	s.stats.StartTime = s.startTime
 	s.stats.Uptime = time.Since(s.startTime).String()
-
-	// Legacy single client stats
-	if s.waClient != nil {
-		s.stats.WhatsAppConnected = s.waClient.IsConnected()
-		if jid := s.waClient.GetJID(); jid != nil {
-			s.stats.WhatsAppJID = fmt.Sprintf("%v", jid)
-		}
-	}
-
-	// Multi-tenant client stats
-	if s.clientManager != nil {
-		s.stats.ActiveClients = s.clientManager.GetActiveClients()
-	}
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(s.stats)
@@ -312,46 +267,6 @@ func (s *Server) handleConnectMinimal(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// handleConnectClient handles POST /connect-client requests
-func (s *Server) handleConnectClient(w http.ResponseWriter, r *http.Request) {
-	if s.clientManager == nil {
-		http.Error(w, "Client manager not available", http.StatusServiceUnavailable)
-		return
-	}
-
-	var req manager.ConnectClientRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		s.logger.Error("Failed to decode connect client request", zap.Error(err))
-		http.Error(w, "Invalid JSON request", http.StatusBadRequest)
-		return
-	}
-
-	// Validate client ID
-	if req.ClientID == "" {
-		http.Error(w, "client_id is required", http.StatusBadRequest)
-		return
-	}
-
-	// Connect client
-	ctx := r.Context()
-	response, err := s.clientManager.ConnectClient(ctx, req)
-	if err != nil {
-		s.logger.Error("Failed to connect client",
-			zap.Error(err),
-			zap.String("client_id", req.ClientID))
-
-		http.Error(w, fmt.Sprintf("Failed to connect client: %v", err), http.StatusInternalServerError)
-		return
-	}
-
-	s.logger.Info("Client connection initiated",
-		zap.String("client_id", req.ClientID),
-		zap.String("session_id", response.SessionID))
-
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(response)
-}
 
 // handleDebugConfig returns configuration information (with sensitive data masked)
 func (s *Server) handleDebugConfig(w http.ResponseWriter, r *http.Request) {
@@ -370,15 +285,7 @@ func (s *Server) handleDebugConfig(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleDebugWhatsApp(w http.ResponseWriter, r *http.Request) {
 	response := map[string]interface{}{
 		"timestamp": time.Now(),
-	}
-
-	if s.waClient != nil {
-		response["connected"] = s.waClient.IsConnected()
-		if jid := s.waClient.GetJID(); jid != nil {
-			response["jid"] = fmt.Sprintf("%v", jid)
-		}
-	} else {
-		response["client"] = "not_initialized"
+		"message":   "WhatsApp clients are managed per-session via /connect-minimal endpoint",
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -424,21 +331,11 @@ func (s *Server) handleMetrics(w http.ResponseWriter, r *http.Request) {
 # TYPE tennex_bridge_uptime_seconds counter
 tennex_bridge_uptime_seconds %.0f
 
-# HELP tennex_bridge_whatsapp_connected WhatsApp connection status
-# TYPE tennex_bridge_whatsapp_connected gauge
-tennex_bridge_whatsapp_connected %d
-
 # HELP tennex_bridge_info Information about the bridge service
 # TYPE tennex_bridge_info gauge
 tennex_bridge_info{version="0.1.0"} 1
 `,
 		time.Since(s.startTime).Seconds(),
-		func() int {
-			if s.waClient != nil && s.waClient.IsConnected() {
-				return 1
-			}
-			return 0
-		}(),
 	)
 
 	w.Header().Set("Content-Type", "text/plain")
