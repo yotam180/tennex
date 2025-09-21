@@ -24,7 +24,7 @@ ARG GIT_COMMIT
 RUN CGO_ENABLED=1 GOOS=linux go build \
     -a -installsuffix cgo \
     -ldflags "-X main.Version=dev -X main.BuildTime=docker-build -X main.GitCommit=dev -s -w" \
-    -o bridge ./cmd/bridge
+    -o dist/bridge ./cmd/bridge
 
 # Runtime stage
 FROM alpine:3.19
@@ -40,7 +40,7 @@ RUN addgroup -g 1001 -S tennex && \
 WORKDIR /app
 
 # Copy binary from builder stage
-COPY --from=builder /build/bridge .
+COPY --from=builder /build/dist/bridge .
 
 # Copy configuration files (optional - using env vars primarily)
 COPY config/ ./config/

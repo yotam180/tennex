@@ -104,7 +104,6 @@ func (s *Server) setupRoutes(enablePprof, enableMetrics bool) {
 	s.router.HandleFunc("/ready", s.handleReady).Methods("GET")
 	s.router.HandleFunc("/stats", s.handleStats).Methods("GET")
 
-
 	// Minimal QR/connect endpoint (stateless, direct whatsmeow usage)
 	s.router.HandleFunc("/connect-minimal", s.handleConnectMinimal).Methods("POST")
 
@@ -266,7 +265,6 @@ func (s *Server) handleConnectMinimal(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 }
-
 
 // handleDebugConfig returns configuration information (with sensitive data masked)
 func (s *Server) handleDebugConfig(w http.ResponseWriter, r *http.Request) {
