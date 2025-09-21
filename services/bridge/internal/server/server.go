@@ -17,6 +17,8 @@ import (
 	"go.mau.fi/whatsmeow"
 	"go.mau.fi/whatsmeow/store/sqlstore"
 	waLog "go.mau.fi/whatsmeow/util/log"
+
+	_ "github.com/mattn/go-sqlite3" // SQLite driver
 )
 
 // Server provides HTTP endpoints for health checks, metrics, and debugging
