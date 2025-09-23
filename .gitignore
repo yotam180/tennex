@@ -13,8 +13,6 @@
 /dist/
 **/dist/
 **/tmp/
-bridge
-**/bridge
 
 # Go build artifacts
 *.o
