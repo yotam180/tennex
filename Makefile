@@ -47,21 +47,21 @@ gen: ## Generate code from contracts (OpenAPI, protobuf, sqlc)
 migrate: ## Run database migrations
 	@echo "📊 Running database migrations..."
 	@echo "Applying schema files to local database..."
-	@PGPASSWORD=tennex123 psql -h localhost -p 5432 -U tennex -d tennex -f pkg/db/schema/001_initial_schema.sql
+	@docker exec -i tennex-postgres psql -U tennex -d tennex < pkg/db/schema/001_initial_schema.sql
 	@echo "✅ Migrations completed successfully"
 
 migrate-all: ## Run all database migrations (useful for new schema files)
 	@echo "📊 Running all database migrations..."
 	@for file in pkg/db/schema/*.sql; do \
 		echo "Applying $$file..."; \
-		PGPASSWORD=tennex123 psql -h localhost -p 5432 -U tennex -d tennex -f "$$file"; \
+		docker exec -i tennex-postgres psql -U tennex -d tennex < "$$file"; \
 	done
 	@echo "✅ All migrations completed successfully"
 
 db-reset: ## Reset database (drop and recreate all tables)
 	@echo "🔄 Resetting database..."
 	@echo "⚠️  This will destroy all data!"
-	@PGPASSWORD=tennex123 psql -h localhost -p 5432 -U tennex -d tennex -c "DROP SCHEMA IF EXISTS public CASCADE; CREATE SCHEMA public;"
+	@docker exec -i tennex-postgres psql -U tennex -d tennex -c "DROP SCHEMA IF EXISTS public CASCADE; CREATE SCHEMA public;"
 	@$(MAKE) migrate-all
 	@echo "✅ Database reset completed"
 

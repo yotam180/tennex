@@ -27,6 +27,7 @@ import (
 	"github.com/tennex/backend/internal/grpc/server"
 	"github.com/tennex/backend/internal/http/handlers"
 	"github.com/tennex/backend/internal/repo"
+	dbgen "github.com/tennex/pkg/db/gen"
 )
 
 type Config struct {
@@ -50,6 +51,10 @@ type Config struct {
 	NATS struct {
 		URL string `koanf:"url"`
 	} `koanf:"nats"`
+
+	Auth struct {
+		JWTSecret string `koanf:"jwt_secret"`
+	} `koanf:"auth"`
 
 	Log struct {
 		Level string `koanf:"level"`
@@ -111,6 +116,9 @@ func main() {
 	outboxRepo := repo.NewOutboxRepository(dbPool)
 	accountRepo := repo.NewAccountRepository(dbPool)
 
+	// Create database queries for generated code
+	queries := dbgen.New(dbPool)
+
 	// Create core services
 	eventService := core.NewEventService(eventRepo, natsConn, logger)
 	outboxService := core.NewOutboxService(outboxRepo, eventRepo, logger)
@@ -130,7 +138,7 @@ func main() {
 			Port: config.HTTP.Port,
 			Host: config.HTTP.Host,
 		}
-		if err := runHTTPServer(ctx, httpConfig, eventService, outboxService, accountService, logger); err != nil {
+		if err := runHTTPServer(ctx, httpConfig, eventService, outboxService, accountService, queries, config.Auth.JWTSecret, logger); err != nil {
 			logger.Error("HTTP server error", zap.Error(err))
 		}
 	}()
@@ -186,6 +194,7 @@ func loadConfig() (*Config, error) {
 	config.Database.MinConns = 5
 	config.Database.MaxConnLifetime = "1h"
 	config.NATS.URL = "nats://localhost:4222"
+	config.Auth.JWTSecret = "dev-jwt-secret-change-in-production"
 	config.Log.Level = "info"
 	config.Log.JSON = false
 
@@ -294,7 +303,7 @@ func setupNATS(url string, logger *zap.Logger) (*nats.Conn, error) {
 func runHTTPServer(ctx context.Context, httpConfig struct {
 	Port int
 	Host string
-}, eventService *core.EventService, outboxService *core.OutboxService, accountService *core.AccountService, logger *zap.Logger) error {
+}, eventService *core.EventService, outboxService *core.OutboxService, accountService *core.AccountService, queries *dbgen.Queries, jwtSecret string, logger *zap.Logger) error {
 
 	router := chi.NewRouter()
 
@@ -316,7 +325,7 @@ func runHTTPServer(ctx context.Context, httpConfig struct {
 	}))
 
 	// API handlers
-	apiHandler := handlers.NewAPIHandler(eventService, outboxService, accountService, logger)
+	apiHandler := handlers.NewAPIHandler(eventService, outboxService, accountService, queries, jwtSecret, logger)
 	router.Mount("/", apiHandler.Routes())
 
 	addr := fmt.Sprintf("%s:%d", httpConfig.Host, httpConfig.Port)

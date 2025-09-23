@@ -12,6 +12,7 @@ import (
 
 	"github.com/tennex/backend/internal/core"
 	"github.com/tennex/backend/internal/repo"
+	dbgen "github.com/tennex/pkg/db/gen"
 	"github.com/tennex/pkg/events"
 )
 
@@ -20,15 +21,19 @@ type APIHandler struct {
 	eventService   *core.EventService
 	outboxService  *core.OutboxService
 	accountService *core.AccountService
+	authHandler    *AuthHandler
 	logger         *zap.Logger
 }
 
 // NewAPIHandler creates a new API handler
-func NewAPIHandler(eventService *core.EventService, outboxService *core.OutboxService, accountService *core.AccountService, logger *zap.Logger) *APIHandler {
+func NewAPIHandler(eventService *core.EventService, outboxService *core.OutboxService, accountService *core.AccountService, queries *dbgen.Queries, jwtSecret string, logger *zap.Logger) *APIHandler {
+	authHandler := NewAuthHandler(queries, jwtSecret, logger)
+
 	return &APIHandler{
 		eventService:   eventService,
 		outboxService:  outboxService,
 		accountService: accountService,
+		authHandler:    authHandler,
 		logger:         logger.Named("api_handler"),
 	}
 }
@@ -37,7 +42,13 @@ func NewAPIHandler(eventService *core.EventService, outboxService *core.OutboxSe
 func (h *APIHandler) Routes() chi.Router {
 	r := chi.NewRouter()
 
+	// Public routes
 	r.Get("/health", h.GetHealth)
+
+	// Authentication routes
+	r.Mount("/auth", h.authHandler.Routes())
+
+	// Protected routes (in a real app, you'd add JWT middleware here)
 	r.Post("/outbox", h.CreateOutboxMessage)
 	r.Get("/sync", h.SyncEvents)
 	r.Get("/qr", h.GetQRCode)

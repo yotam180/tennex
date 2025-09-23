@@ -1,6 +1,8 @@
 module github.com/tennex/backend
 
-go 1.22
+go 1.24.0
+
+toolchain go1.24.6
 
 require (
 	github.com/go-chi/chi/v5 v5.0.12
@@ -15,6 +17,8 @@ require (
 	go.uber.org/zap v1.27.0
 	google.golang.org/grpc v1.62.1
 )
+
+require github.com/golang-jwt/jwt/v5 v5.3.0 // indirect
 
 require (
 	github.com/fsnotify/fsnotify v1.7.0 // indirect
@@ -32,11 +36,11 @@ require (
 	github.com/rogpeppe/go-internal v1.6.1 // indirect
 	github.com/tennex/pkg v0.0.0
 	go.uber.org/multierr v1.10.0 // indirect
-	golang.org/x/crypto v0.21.0 // indirect
-	golang.org/x/net v0.23.0 // indirect
-	golang.org/x/sync v0.6.0 // indirect
-	golang.org/x/sys v0.18.0 // indirect
-	golang.org/x/text v0.14.0 // indirect
+	golang.org/x/crypto v0.42.0 // indirect
+	golang.org/x/net v0.43.0 // indirect
+	golang.org/x/sync v0.17.0 // indirect
+	golang.org/x/sys v0.36.0 // indirect
+	golang.org/x/text v0.29.0 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20240123012728-ef4313101c80 // indirect
 	google.golang.org/protobuf v1.33.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
