@@ -7,10 +7,12 @@ toolchain go1.24.6
 require (
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/mux v1.8.1
-	github.com/lib/pq v1.10.9
+	github.com/mattn/go-sqlite3 v1.14.32
+	github.com/mdp/qrterminal/v3 v3.2.1
 	github.com/spf13/viper v1.18.2
 	go.mau.fi/whatsmeow v0.0.0-20250919124702-c8bdfd36d05e
 	go.uber.org/zap v1.26.0
+	google.golang.org/protobuf v1.36.9
 )
 
 require (
@@ -42,8 +44,9 @@ require (
 	golang.org/x/exp v0.0.0-20250911091902-df9299821621 // indirect
 	golang.org/x/net v0.44.0 // indirect
 	golang.org/x/sys v0.36.0 // indirect
+	golang.org/x/term v0.35.0 // indirect
 	golang.org/x/text v0.29.0 // indirect
-	google.golang.org/protobuf v1.36.9 // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
+	rsc.io/qr v0.2.0 // indirect
 )

@@ -6,15 +6,25 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
-	"time"
 
 	qrterminal "github.com/mdp/qrterminal/v3"
 	"go.mau.fi/whatsmeow"
+	"go.mau.fi/whatsmeow/proto/waCompanionReg"
+	"go.mau.fi/whatsmeow/store"
 	"go.mau.fi/whatsmeow/store/sqlstore"
+	"go.mau.fi/whatsmeow/types/events"
 	waLog "go.mau.fi/whatsmeow/util/log"
+	"google.golang.org/protobuf/proto"
 
 	_ "github.com/mattn/go-sqlite3"
 )
+
+func eventHandler(evt interface{}) {
+	switch v := evt.(type) {
+	case *events.Message:
+		fmt.Println("Received a message!", v.Message.GetConversation())
+	}
+}
 
 func main() {
 	// Context with cancel for the whole run
@@ -42,6 +52,10 @@ func main() {
 		os.Exit(1)
 	}
 
+	store.DeviceProps.Os = proto.String("Temple OS")
+	store.DeviceProps.PlatformType = waCompanionReg.DeviceProps_CHROME.Enum()
+	store.DeviceProps.RequireFullSync = proto.Bool(true)
+
 	device, err := container.GetFirstDevice(ctx)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to get device store: %v\n", err)
@@ -49,6 +63,7 @@ func main() {
 	}
 
 	client := whatsmeow.NewClient(device, nil)
+	client.AddEventHandler(eventHandler)
 
 	// Get QR channel BEFORE connect, as per whatsmeow pattern
 	qrChan, err := client.GetQRChannel(ctx)
@@ -63,38 +78,27 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Timeout guard for QR flow
-	timeoutCtx, cancelTimeout := context.WithTimeout(ctx, 2*time.Minute)
-	defer cancelTimeout()
-
-	for {
-		select {
-		case evt := <-qrChan:
-			switch evt.Event {
-			case "code":
-				fmt.Println("\nScan this QR with WhatsApp:")
-				qrterminal.GenerateHalfBlock(evt.Code, qrterminal.L, os.Stdout)
-				fmt.Println()
-				fmt.Println("(If it expires, just run again.)")
-			case "timeout":
-				fmt.Fprintln(os.Stderr, "QR timed out. Re-run to retry.")
-				client.Disconnect()
-				os.Exit(2)
-			case "success":
-				jid := ""
-				if client.Store != nil && client.Store.ID != nil {
-					jid = client.Store.ID.String()
-				}
-				fmt.Printf("\nQR scan successful. Session established. JID: %s\n", jid)
-				client.Disconnect()
-				os.Exit(0)
-			default:
-				// ignore other events
+	for evt := range qrChan {
+		switch evt.Event {
+		case "code":
+			fmt.Println("\nScan this QR with WhatsApp:")
+			qrterminal.GenerateHalfBlock(evt.Code, qrterminal.L, os.Stdout)
+			fmt.Println()
+			fmt.Println("(If it expires, just run again.)")
+		case "timeout":
+			fmt.Fprintln(os.Stderr, "QR timed out. Re-run to retry.")
+		case "success":
+			jid := ""
+			if client.Store != nil && client.Store.ID != nil {
+				jid = client.Store.ID.String()
 			}
-		case <-timeoutCtx.Done():
-			fmt.Fprintln(os.Stderr, "Timed out waiting for QR scan. Exiting.")
-			client.Disconnect()
-			os.Exit(3)
+			fmt.Printf("\nQR scan successful. Session established. JID: %s\n", jid)
+		default:
+			// ignore other events
 		}
 	}
+
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
+	<-c
 }
