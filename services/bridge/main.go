@@ -62,7 +62,7 @@ func main() {
 	})
 
 	// Start HTTP server
-	port := ":8080"
+	port := ":8081"
 	fmt.Printf("🌐 HTTP Server starting on port %s\n", port)
 	fmt.Printf("📋 Endpoints:\n")
 	fmt.Printf("   GET  /health  - Health check\n")
