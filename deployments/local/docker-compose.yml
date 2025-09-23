@@ -67,6 +67,71 @@ services:
     networks:
       - tennex-net
 
+  backend:
+    build:
+      context: ../../
+      dockerfile: services/backend/Dockerfile
+    container_name: tennex-backend
+    restart: unless-stopped
+    environment:
+      TENNEX_HTTP_PORT: 6000
+      TENNEX_GRPC_PORT: 6001
+      TENNEX_DATABASE_URL: postgres://tennex:tennex123@postgres:5432/tennex?sslmode=disable
+      TENNEX_NATS_URL: nats://nats:4222
+      TENNEX_LOG_LEVEL: debug
+    ports:
+      - "6000:6000"  # HTTP API
+      - "6001:6001"  # gRPC
+    depends_on:
+      postgres:
+        condition: service_healthy
+      nats:
+        condition: service_healthy
+    networks:
+      - tennex-net
+    profiles:
+      - full
+
+  eventstream:
+    build:
+      context: ../../
+      dockerfile: services/eventstream/Dockerfile
+    container_name: tennex-eventstream
+    restart: unless-stopped
+    environment:
+      TENNEX_EVENTSTREAM_HTTP_PORT: 6002
+      TENNEX_EVENTSTREAM_NATS_URL: nats://nats:4222
+      TENNEX_EVENTSTREAM_BACKEND_URL: http://backend:6000
+      TENNEX_LOG_LEVEL: debug
+    ports:
+      - "6002:6002"  # WebSocket API
+    depends_on:
+      - backend
+      - nats
+    networks:
+      - tennex-net
+    profiles:
+      - full
+
+  bridge:
+    build:
+      context: ../../
+      dockerfile: services/bridge/Dockerfile
+    container_name: tennex-bridge
+    restart: unless-stopped
+    environment:
+      TENNEX_BRIDGE_HTTP_PORT: 6003
+      TENNEX_BRIDGE_BACKEND_URL: http://backend:6000
+      TENNEX_LOG_LEVEL: debug
+    ports:
+      - "6003:6003"  # Bridge API
+    depends_on:
+      - backend
+    networks:
+      - tennex-net
+    profiles:
+      - full
+
   pgadmin:
     image: dpage/pgadmin4:latest
     container_name: tennex-pgadmin

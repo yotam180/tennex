@@ -153,9 +153,9 @@ func loadConfig() (*Config, error) {
 
 	// Load defaults
 	config := &Config{}
-	config.HTTP.Port = 8082
+	config.HTTP.Port = 6000
 	config.HTTP.Host = "0.0.0.0"
-	config.GRPC.Port = 9001
+	config.GRPC.Port = 6001
 	config.GRPC.Host = "0.0.0.0"
 	config.Database.URL = "postgres://tennex:tennex123@localhost:5432/tennex?sslmode=disable"
 	config.Database.MaxConns = 25

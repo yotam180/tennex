@@ -67,31 +67,39 @@ make gen
 
 ### 3. Run Services
 
+The services use defaults that connect to the Docker infrastructure automatically:
+
 ```bash
-# Backend API (port 8082)
+# Terminal 1 - Backend API (port 6000)
 cd services/backend && go run cmd/backend/main.go
 
-# Event Stream (port 8083) 
+# Terminal 2 - Event Stream (port 6002) 
 cd services/eventstream && go run cmd/eventstream/main.go
 
-# Bridge (port 8081) - Your existing WhatsApp integration
+# Terminal 3 - Bridge (port 6003) - Your existing WhatsApp integration
 cd services/bridge && go run main.go
+```
+
+**Development options:**
+```bash
+make dev       # Infrastructure only (for local Go development)
+make dev-full  # Everything in Docker (slower but consistent)
 ```
 
 ### 4. Test API
 
 ```bash
 # Health check
-curl http://localhost:8082/health
+curl http://localhost:6000/health
 
 # List accounts
-curl http://localhost:8082/accounts
+curl http://localhost:6000/accounts
 
 # Sync events
-curl "http://localhost:8082/sync?account_id=test-account&since=0&limit=10"
+curl "http://localhost:6000/sync?account_id=test-account&since=0&limit=10"
 
 # WebSocket connection
-wscat -c "ws://localhost:8083/ws?account_id=test-account"
+wscat -c "ws://localhost:6002/ws?account_id=test-account"
 ```
 
 ## Project Structure
@@ -187,26 +195,28 @@ Run `make gen` to regenerate all code after schema changes.
 
 ## Configuration
 
-Environment variables (prefix with `TENNEX_`):
+### Development (Default Values)
+
+All services have sensible defaults for local development:
+
+- **Backend**: HTTP `:6000`, gRPC `:6001`
+- **Event Stream**: HTTP `:6002`  
+- **Bridge**: HTTP `:6003`
+- **Database**: `postgres://tennex:tennex123@localhost:5432/tennex`
+- **NATS**: `nats://localhost:4222`
+
+### Production (Environment Variables)
+
+Override any setting with environment variables (prefix `TENNEX_`):
 
 ```bash
-# Database
 TENNEX_DATABASE_URL=postgres://user:pass@host:port/db
-TENNEX_DATABASE_MAX_CONNS=25
-
-# NATS  
+TENNEX_HTTP_PORT=6000
+TENNEX_GRPC_PORT=6001
 TENNEX_NATS_URL=nats://localhost:4222
-
-# HTTP
-TENNEX_HTTP_PORT=8082
-TENNEX_GRPC_PORT=9001
-
-# Logging
 TENNEX_LOG_LEVEL=info
-TENNEX_LOG_JSON=false
+TENNEX_LOG_JSON=true
 ```
-
-See `deployments/local/env.example` for all options.
 
 ## Next Steps
 

@@ -10,11 +10,34 @@ help: ## Show this help message
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2}'
 
 # Development workflow
-dev: docker-up ## Start full development environment
-	@echo "🚀 Starting development environment..."
-	@echo "Postgres: http://localhost:8080 (admin@tennex.com / admin123)"
-	@echo "Backend will be available at: http://localhost:8082"
-	@echo "Bridge will be available at: http://localhost:8081"
+dev-infra: docker-up ## Start infrastructure only (for local development)
+	@echo "🚀 Starting infrastructure services..."
+	@echo ""
+	@echo "📊 Infrastructure:"
+	@echo "  Postgres: http://localhost:8080 (admin@tennex.com / admin123)"
+	@echo "  NATS Monitor: http://localhost:8222"
+	@echo "  MinIO Console: http://localhost:9001 (tennex / tennex123)"
+	@echo ""
+	@echo "🔧 Next steps for local development:"
+	@echo "  make gen                    # Generate contracts"
+	@echo "  cd services/backend && go run cmd/backend/main.go     # Port 6000"
+	@echo "  cd services/eventstream && go run cmd/eventstream/main.go # Port 6002"
+	@echo "  cd services/bridge && go run main.go                  # Port 6003"
+	@echo ""
+	@echo "🐳 Or run everything in Docker:"
+	@echo "  make dev               # Run all services in containers"
+
+dev: ## Start full environment in Docker (including Go services)
+	@echo "🚀 Starting full Docker environment..."
+	@cd deployments/local && docker-compose --profile full up --build -d
+	@echo ""
+	@echo "📊 All services running:"
+	@echo "  Backend API: http://localhost:6000"
+	@echo "  Event Stream: http://localhost:6002"
+	@echo "  Bridge API: http://localhost:6003"
+	@echo "  Postgres: http://localhost:8080 (admin@tennex.com / admin123)"
+	@echo "  NATS Monitor: http://localhost:8222"
+	@echo "  MinIO Console: http://localhost:9001 (tennex / tennex123)"
 
 gen: ## Generate code from contracts (OpenAPI, protobuf, sqlc)
 	@echo "🔄 Generating code from contracts..."

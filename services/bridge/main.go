@@ -44,7 +44,7 @@ func main() {
 		createWhatsappConnection(c, whatsappConnector, ctx)
 	})
 
-	if err := router.Run(":8081"); err != nil {
+	if err := router.Run(":6003"); err != nil {
 		fmt.Printf("❌ Failed to start HTTP server: %v\n", err)
 		os.Exit(1)
 	}
