@@ -1,0 +1,31 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: tennex-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: tennex
+      POSTGRES_USER: tennex
+      POSTGRES_PASSWORD: tennex123
+      PGDATA: /var/lib/postgresql/data/pgdata
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tennex -d tennex"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - tennex-net
+
+volumes:
+  postgres_data:
+    driver: local
+
+networks:
+  tennex-net:
+    driver: bridge
