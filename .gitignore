@@ -1,103 +1,68 @@
-# Tennex Project .gitignore
-
 # Binaries for programs and plugins
 *.exe
 *.exe~
 *.dll
 *.so
 *.dylib
+bin/
+dist/
 
-# Go build artifacts and directories
-/build/
-**/build/
-/dist/
-**/dist/
-**/tmp/
-
-# Go build artifacts
-*.o
-*.a
+# Test binary, built with `go test -c`
 *.test
-*.prof
-*.out
-coverage.html
-go.work
 
-# IDE and editor files
+# Output of the go coverage tool
+*.out
+
+# Dependency directories
+vendor/
+
+# Go workspace file
+go.work.sum
+
+# IDE files
 .vscode/
 .idea/
 *.swp
 *.swo
 *~
-.DS_Store
+
+# Generated code
+pkg/api/gen/
+pkg/proto/gen/
+pkg/db/gen/
+
+# Environment files
 .env
-
-# OS generated files
-Thumbs.db
-Desktop.ini
-
-# Session and sensitive data
-**/session/
-**/session.db*
-session/
-session.db*
-*.session
-*.key
-*.pem
-
-# Logs
-*.log
-logs/
-**/logs/
-
-# Configuration files that might contain secrets
-config/production.yaml
-config/staging.yaml
-*.secret.yaml
 .env.local
-.env.production
-.env.staging
-
-# Temporary files
-tmp/
-temp/
-**/tmp/
-**/temp/
-
-# Development tools output
-*.trace
-*.pprof
-
-# Air live reload tool
-.air.toml.local
+*.env
 
 # Database files
 *.db
 *.sqlite
 *.sqlite3
 
-# Test coverage
-coverage.out
+# Logs
+*.log
+logs/
+
+# Docker
+.dockerignore
+
+# macOS
+.DS_Store
+
+# Node modules (if any frontend is added later)
+node_modules/
+
+# Temporary files
+tmp/
+temp/
+.tmp/
+
+# Coverage reports
 coverage.html
+coverage.out
 
-# Vendor directory (if using)
-vendor/
-
-# Backup files
-*.bak
-*.backup
-*.orig
-
-# Local development overrides
-docker-compose.local.yml
-config.local.yaml
-*.local.yaml
-*.dev.yaml
-
-# Runtime data
-pids/
-*.pid
-*.seed
-*.pid.lock
-
-event_history/
+# Build artifacts
+*.tar.gz
+*.zip

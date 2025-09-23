@@ -1,0 +1,138 @@
+syntax = "proto3";
+
+package tennex.bridge.v1;
+
+option go_package = "github.com/tennex/pkg/proto/gen/bridge/v1;bridgev1";
+
+import "google/protobuf/timestamp.proto";
+
+// Bridge service handles communication between WhatsApp bridge and backend
+service BridgeService {
+  // Publish an inbound event from WhatsApp to the backend
+  rpc PublishInbound(PublishInboundRequest) returns (PublishInboundResponse);
+  
+  // Send a message through WhatsApp
+  rpc SendMessage(SendMessageRequest) returns (SendMessageResponse);
+  
+  // Get QR code for WhatsApp pairing
+  rpc GetQRCode(GetQRCodeRequest) returns (GetQRCodeResponse);
+  
+  // Update account status
+  rpc UpdateAccountStatus(UpdateAccountStatusRequest) returns (UpdateAccountStatusResponse);
+}
+
+// Event represents a single event in the system
+message Event {
+  string id = 1;
+  string type = 2;
+  string account_id = 3;
+  string device_id = 4;
+  string convo_id = 5;
+  string wa_message_id = 6;
+  string sender_jid = 7;
+  bytes payload = 8; // JSON-encoded payload
+  bytes attachment_ref = 9; // JSON-encoded attachment reference
+  google.protobuf.Timestamp timestamp = 10;
+}
+
+// Publish inbound event from bridge to backend
+message PublishInboundRequest {
+  Event event = 1;
+}
+
+message PublishInboundResponse {
+  int64 seq = 1; // Assigned sequence number
+  bool created = 2; // Whether event was newly created or deduplicated
+}
+
+// Send message through WhatsApp
+message SendMessageRequest {
+  string client_msg_uuid = 1;
+  string account_id = 2;
+  string convo_id = 3;
+  string to_jid = 4;
+  MessageContent content = 5;
+  string reply_to_wa_message_id = 6;
+}
+
+message SendMessageResponse {
+  bool success = 1;
+  string wa_message_id = 2; // WhatsApp-assigned message ID
+  string error = 3; // Error message if success = false
+}
+
+message MessageContent {
+  oneof content {
+    TextContent text = 1;
+    ImageContent image = 2;
+    AudioContent audio = 3;
+    VideoContent video = 4;
+    DocumentContent document = 5;
+  }
+}
+
+message TextContent {
+  string text = 1;
+}
+
+message ImageContent {
+  bytes data = 1;
+  string mime_type = 2;
+  string caption = 3;
+}
+
+message AudioContent {
+  bytes data = 1;
+  string mime_type = 2;
+  int32 duration_seconds = 3;
+}
+
+message VideoContent {
+  bytes data = 1;
+  string mime_type = 2;
+  string caption = 3;
+  int32 duration_seconds = 4;
+}
+
+message DocumentContent {
+  bytes data = 1;
+  string mime_type = 2;
+  string filename = 3;
+}
+
+// QR code generation
+message GetQRCodeRequest {
+  string account_id = 1;
+}
+
+message GetQRCodeResponse {
+  bytes qr_code_png = 1; // PNG image data
+  string pairing_session_id = 2;
+  google.protobuf.Timestamp expires_at = 3;
+}
+
+// Account status updates
+message UpdateAccountStatusRequest {
+  string account_id = 1;
+  AccountStatus status = 2;
+  google.protobuf.Timestamp last_seen = 3;
+  AccountInfo info = 4; // Optional account details
+}
+
+message UpdateAccountStatusResponse {
+  bool success = 1;
+}
+
+message AccountInfo {
+  string wa_jid = 1;
+  string display_name = 2;
+  string avatar_url = 3;
+}
+
+enum AccountStatus {
+  ACCOUNT_STATUS_UNSPECIFIED = 0;
+  ACCOUNT_STATUS_DISCONNECTED = 1;
+  ACCOUNT_STATUS_CONNECTING = 2;
+  ACCOUNT_STATUS_CONNECTED = 3;
+  ACCOUNT_STATUS_ERROR = 4;
+}

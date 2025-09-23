@@ -1,0 +1,403 @@
+openapi: 3.0.3
+info:
+  title: Tennex Backend API
+  description: WhatsApp Bridge Backend REST API
+  version: 1.0.0
+  contact:
+    name: Tennex Team
+servers:
+  - url: http://localhost:8082
+    description: Local development server
+
+paths:
+  /health:
+    get:
+      summary: Health check
+      operationId: getHealth
+      tags:
+        - System
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+
+  /outbox:
+    post:
+      summary: Send a message (queue for delivery)
+      operationId: createOutboxMessage
+      tags:
+        - Messaging
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SendMessageRequest'
+      responses:
+        '201':
+          description: Message queued successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SendMessageResponse'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /sync:
+    get:
+      summary: Sync events since a sequence number
+      operationId: syncEvents
+      tags:
+        - Sync
+      parameters:
+        - name: account_id
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Account identifier
+        - name: since
+          in: query
+          required: false
+          schema:
+            type: integer
+            format: int64
+            default: 0
+          description: Sequence number to sync from
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 1000
+            default: 100
+          description: Maximum number of events to return
+      responses:
+        '200':
+          description: Events retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SyncResponse'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /qr:
+    get:
+      summary: Get QR code for WhatsApp pairing
+      operationId: getQRCode
+      tags:
+        - Authentication
+      parameters:
+        - name: account_id
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Account identifier for pairing
+      responses:
+        '200':
+          description: QR code generated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QRResponse'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Failed to generate QR code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /accounts:
+    get:
+      summary: List all accounts
+      operationId: listAccounts
+      tags:
+        - Accounts
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+        - name: offset
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+      responses:
+        '200':
+          description: Accounts retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccountsResponse'
+
+  /accounts/{account_id}:
+    get:
+      summary: Get account details
+      operationId: getAccount
+      tags:
+        - Accounts
+      parameters:
+        - name: account_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Account details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Account'
+        '404':
+          description: Account not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+components:
+  schemas:
+    HealthResponse:
+      type: object
+      required:
+        - status
+        - timestamp
+      properties:
+        status:
+          type: string
+          example: "ok"
+        timestamp:
+          type: string
+          format: date-time
+        version:
+          type: string
+          example: "1.0.0"
+
+    SendMessageRequest:
+      type: object
+      required:
+        - client_msg_uuid
+        - account_id
+        - convo_id
+        - message_type
+        - content
+      properties:
+        client_msg_uuid:
+          type: string
+          format: uuid
+          description: Client-provided UUID for idempotency
+        account_id:
+          type: string
+          description: Account sending the message
+        convo_id:
+          type: string
+          description: Conversation/chat identifier
+        message_type:
+          type: string
+          enum: [text, image, audio, video, document]
+          description: Type of message content
+        content:
+          type: object
+          description: Message content (varies by type)
+        reply_to:
+          type: string
+          format: uuid
+          description: Optional - reply to this message ID
+
+    SendMessageResponse:
+      type: object
+      required:
+        - server_msg_id
+        - status
+        - client_msg_uuid
+      properties:
+        server_msg_id:
+          type: integer
+          format: int64
+          description: Server-assigned sequence number
+        status:
+          type: string
+          enum: [queued, sending]
+          description: Current message status
+        client_msg_uuid:
+          type: string
+          format: uuid
+          description: Echo of client UUID
+
+    SyncResponse:
+      type: object
+      required:
+        - events
+        - next_seq
+        - has_more
+      properties:
+        events:
+          type: array
+          items:
+            $ref: '#/components/schemas/Event'
+        next_seq:
+          type: integer
+          format: int64
+          description: Next sequence number for pagination
+        has_more:
+          type: boolean
+          description: Whether more events are available
+
+    Event:
+      type: object
+      required:
+        - seq
+        - id
+        - timestamp
+        - type
+        - account_id
+        - convo_id
+        - payload
+      properties:
+        seq:
+          type: integer
+          format: int64
+          description: Sequence number for ordering
+        id:
+          type: string
+          format: uuid
+          description: Unique event identifier
+        timestamp:
+          type: string
+          format: date-time
+        type:
+          type: string
+          enum: [msg_in, msg_out_pending, msg_out_sent, msg_delivery, presence, contact_update, history_sync]
+        account_id:
+          type: string
+        device_id:
+          type: string
+        convo_id:
+          type: string
+        wa_message_id:
+          type: string
+          description: WhatsApp message identifier
+        sender_jid:
+          type: string
+          description: WhatsApp JID of sender
+        payload:
+          type: object
+          description: Event-specific data
+        attachment_ref:
+          type: object
+          description: Reference to media attachments
+
+    QRResponse:
+      type: object
+      required:
+        - qr_code_png
+        - pairing_session_id
+      properties:
+        qr_code_png:
+          type: string
+          format: byte
+          description: Base64-encoded PNG image
+        pairing_session_id:
+          type: string
+          description: Session identifier for this pairing attempt
+        expires_at:
+          type: string
+          format: date-time
+          description: When this QR code expires
+
+    Account:
+      type: object
+      required:
+        - id
+        - status
+        - created_at
+        - updated_at
+      properties:
+        id:
+          type: string
+        wa_jid:
+          type: string
+          description: WhatsApp JID
+        display_name:
+          type: string
+        avatar_url:
+          type: string
+        status:
+          type: string
+          enum: [connected, disconnected, connecting, error]
+        last_seen:
+          type: string
+          format: date-time
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    AccountsResponse:
+      type: object
+      required:
+        - accounts
+        - total
+      properties:
+        accounts:
+          type: array
+          items:
+            $ref: '#/components/schemas/Account'
+        total:
+          type: integer
+          description: Total number of accounts
+
+    ErrorResponse:
+      type: object
+      required:
+        - error
+        - timestamp
+      properties:
+        error:
+          type: string
+          description: Error message
+        code:
+          type: string
+          description: Error code
+        details:
+          type: object
+          description: Additional error details
+        timestamp:
+          type: string
+          format: date-time

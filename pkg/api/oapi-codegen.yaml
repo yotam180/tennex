@@ -1,0 +1,13 @@
+package: api
+output: gen/api.go
+generate:
+  - types
+  - chi-server
+  - spec
+
+output-options:
+  skip-fmt: false
+  skip-prune: false
+
+import-mapping:
+  "github.com/google/uuid": github.com/google/uuid
