@@ -13,14 +13,13 @@ services:
       - ../../services/bridge:/app:cached
       # Exclude node_modules and other build artifacts from sync
       - /app/tmp
-      - /app/sessions
       - /app/logs
-      # Keep persistent volumes for sessions and logs
-      - bridge_sessions:/app/sessions
+      # Keep persistent volumes for logs
       - bridge_logs:/app/logs
     environment:
       # Override for development
       TENNEX_BRIDGE_LOG_LEVEL: debug
+      TENNEX_BRIDGE_DATABASE_URL: "postgres://tennex:tennex123@postgres:5432/tennex?sslmode=disable"
       TENNEX_BRIDGE_DEV_ENABLE_PPROF: true
       TENNEX_BRIDGE_DEV_ENABLE_METRICS: true
       TENNEX_BRIDGE_DEV_QR_IN_TERMINAL: true  # Enable for development

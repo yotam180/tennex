@@ -2,6 +2,26 @@
 # Docker Compose configuration for local development
 
 services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:16-alpine
+    container_name: tennex-postgres
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: tennex
+      POSTGRES_USER: tennex
+      POSTGRES_PASSWORD: tennex123
+      POSTGRES_INITDB_ARGS: "--encoding=UTF-8"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tennex -d tennex"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   # Bridge Service
   bridge:
     build:
@@ -16,8 +36,10 @@ services:
       TENNEX_BRIDGE_HTTP_PORT: 8080
       TENNEX_BRIDGE_LOG_LEVEL: debug
       
+      # PostgreSQL configuration for whatsmeow sessions
+      TENNEX_BRIDGE_DATABASE_URL: "postgres://tennex:tennex123@postgres:5432/tennex?sslmode=disable"
+      
       # WhatsApp configuration
-      TENNEX_BRIDGE_WHATSAPP_SESSION_PATH: /app/sessions
       TENNEX_BRIDGE_WHATSAPP_DB_LOG_LEVEL: INFO
       TENNEX_BRIDGE_WHATSAPP_HISTORY_SYNC: false
       
@@ -29,8 +51,10 @@ services:
       # Runtime environment
       TENNEX_ENV: development
     volumes:
-      - bridge_sessions:/app/sessions
       - bridge_logs:/app/logs
+    depends_on:
+      postgres:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
       interval: 30s
@@ -39,7 +63,7 @@ services:
       start_period: 40s
 
 volumes:
-  bridge_sessions:
+  postgres_data:
     driver: local
   bridge_logs:
     driver: local

@@ -5,8 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"os"
-	"path/filepath"
 	"sync"
 	"time"
 
@@ -18,7 +16,7 @@ import (
 	"go.mau.fi/whatsmeow/store/sqlstore"
 	waLog "go.mau.fi/whatsmeow/util/log"
 
-	_ "github.com/mattn/go-sqlite3" // SQLite driver
+	_ "github.com/lib/pq" // PostgreSQL driver
 )
 
 // Server provides HTTP endpoints for health checks, metrics, and debugging
@@ -27,6 +25,10 @@ type Server struct {
 	server *http.Server
 	logger *zap.Logger
 	port   int
+
+	// Database
+	dbURL       string
+	dbContainer *sqlstore.Container
 
 	// Runtime information
 	startTime time.Time
@@ -42,8 +44,9 @@ type Stats struct {
 
 // Config holds server configuration
 type Config struct {
-	Port   int
-	Logger *zap.Logger
+	Port        int
+	Logger      *zap.Logger
+	DatabaseURL string
 
 	// Feature flags
 	EnablePprof   bool
@@ -56,6 +59,7 @@ func New(cfg Config) *Server {
 		router:    mux.NewRouter(),
 		logger:    cfg.Logger,
 		port:      cfg.Port,
+		dbURL:     cfg.DatabaseURL,
 		startTime: time.Now(),
 		stats:     &Stats{},
 	}
@@ -77,6 +81,11 @@ func New(cfg Config) *Server {
 
 // Start starts the HTTP server
 func (s *Server) Start(ctx context.Context) error {
+	// Initialize database connection
+	if err := s.initDatabase(ctx); err != nil {
+		return fmt.Errorf("failed to initialize database: %w", err)
+	}
+
 	s.logger.Info("Starting HTTP server", zap.Int("port", s.port))
 
 	// Start server in a goroutine
@@ -86,6 +95,20 @@ func (s *Server) Start(ctx context.Context) error {
 		}
 	}()
 
+	return nil
+}
+
+// initDatabase initializes the PostgreSQL connection for whatsmeow
+func (s *Server) initDatabase(ctx context.Context) error {
+	s.logger.Info("Initializing PostgreSQL connection for WhatsApp sessions")
+
+	container, err := sqlstore.New(ctx, "postgres", s.dbURL, waLog.Noop)
+	if err != nil {
+		return fmt.Errorf("failed to connect to PostgreSQL: %w", err)
+	}
+
+	s.dbContainer = container
+	s.logger.Info("PostgreSQL connection initialized successfully")
 	return nil
 }
 
@@ -180,38 +203,33 @@ type connectMinimalResponse struct {
 
 func (s *Server) handleConnectMinimal(w http.ResponseWriter, r *http.Request) {
 	var req connectMinimalRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.ClientID == "" {
-		http.Error(w, "Invalid JSON request: client_id required", http.StatusBadRequest)
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		s.logger.Error("Failed to decode connect minimal request", zap.Error(err))
+		http.Error(w, "Invalid JSON request", http.StatusBadRequest)
 		return
 	}
 
-	// Prepare per-client session dir under /app/sessions-min
-	base := "/app/sessions-min"
-	if v := os.Getenv("TENNEX_BRIDGE_WHATSAPP_SESSION_PATH"); v != "" {
-		base = filepath.Join(v, "..", "sessions-min")
-	}
-	if err := os.MkdirAll(base, 0755); err != nil {
-		http.Error(w, fmt.Sprintf("Failed to create base dir: %v", err), http.StatusInternalServerError)
-		return
-	}
-	sessDir := filepath.Join(base, fmt.Sprintf("client_%s", req.ClientID))
-	if err := os.MkdirAll(sessDir, 0755); err != nil {
-		http.Error(w, fmt.Sprintf("Failed to create session dir: %v", err), http.StatusInternalServerError)
+	if req.ClientID == "" {
+		http.Error(w, "client_id is required", http.StatusBadRequest)
 		return
 	}
 
-	// Create sqlite store and whatsmeow client
-	container, err := sqlstore.New(r.Context(), "sqlite3", fmt.Sprintf("file:%s/session.db?_foreign_keys=on", sessDir), waLog.Noop)
-	if err != nil {
-		http.Error(w, fmt.Sprintf("Failed to create store: %v", err), http.StatusInternalServerError)
+	if s.dbContainer == nil {
+		s.logger.Error("Database container not initialized")
+		http.Error(w, "Internal server error: database not available", http.StatusInternalServerError)
 		return
 	}
-	device, err := container.GetFirstDevice(r.Context())
+
+	// Get device for this client from PostgreSQL (whatsmeow will create a new device if needed)
+	device, err := s.dbContainer.GetFirstDevice(r.Context())
 	if err != nil {
-		http.Error(w, fmt.Sprintf("Failed to get device: %v", err), http.StatusInternalServerError)
+		s.logger.Error("Failed to get device from PostgreSQL", zap.Error(err), zap.String("client_id", req.ClientID))
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
-	client := whatsmeow.NewClient(device, nil)
+
+	// Create whatsmeow client with PostgreSQL-backed store
+	client := whatsmeow.NewClient(device, waLog.Stdout("Client", "INFO", true))
 
 	// Get QR channel and connect
 	qrChan, err := client.GetQRChannel(r.Context())

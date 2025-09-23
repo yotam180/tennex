@@ -7,9 +7,11 @@ log_level: "info"  # debug, info, warn, error, fatal
 # HTTP server settings
 http_port: 8080
 
+# Database settings
+database_url: "postgres://tennex:tennex123@localhost:5432/tennex?sslmode=disable"
+
 # WhatsApp client settings
 whatsapp:
-  session_path: "./session"
   db_log_level: "WARN"  # TRACE, DEBUG, INFO, WARN, ERROR
   history_sync: false
   connect_timeout: "30s"

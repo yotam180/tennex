@@ -19,6 +19,9 @@ type Config struct {
 	// HTTP Server settings
 	HTTPPort int `mapstructure:"http_port"`
 
+	// Database settings
+	DatabaseURL string `mapstructure:"database_url"`
+
 	// WhatsApp settings
 	WhatsApp WhatsAppConfig `mapstructure:"whatsapp"`
 
@@ -27,7 +30,6 @@ type Config struct {
 }
 
 type WhatsAppConfig struct {
-	SessionPath    string        `mapstructure:"session_path"`
 	DBLogLevel     string        `mapstructure:"db_log_level"`
 	HistorySync    bool          `mapstructure:"history_sync"`
 	ConnectTimeout time.Duration `mapstructure:"connect_timeout"`
@@ -53,7 +55,7 @@ func Load() (*Config, error) {
 	v.AutomaticEnv()
 
 	// Explicitly bind nested environment variables
-	v.BindEnv("whatsapp.session_path", "TENNEX_BRIDGE_WHATSAPP_SESSION_PATH")
+	v.BindEnv("database_url", "TENNEX_BRIDGE_DATABASE_URL")
 	v.BindEnv("whatsapp.db_log_level", "TENNEX_BRIDGE_WHATSAPP_DB_LOG_LEVEL")
 	v.BindEnv("whatsapp.history_sync", "TENNEX_BRIDGE_WHATSAPP_HISTORY_SYNC")
 	v.BindEnv("dev.qr_in_terminal", "TENNEX_BRIDGE_DEV_QR_IN_TERMINAL")
@@ -96,8 +98,10 @@ func setDefaults(v *viper.Viper) {
 	v.SetDefault("log_level", "info")
 	v.SetDefault("http_port", 8080)
 
+	// Database defaults
+	v.SetDefault("database_url", "postgres://tennex:tennex123@localhost:5432/tennex?sslmode=disable")
+
 	// WhatsApp defaults
-	v.SetDefault("whatsapp.session_path", "./session")
 	v.SetDefault("whatsapp.db_log_level", "WARN")
 	v.SetDefault("whatsapp.history_sync", false)
 	v.SetDefault("whatsapp.connect_timeout", "30s")
@@ -111,6 +115,10 @@ func setDefaults(v *viper.Viper) {
 func validate(cfg *Config) error {
 	if cfg.HTTPPort < 1 || cfg.HTTPPort > 65535 {
 		return fmt.Errorf("invalid http_port: %d", cfg.HTTPPort)
+	}
+
+	if cfg.DatabaseURL == "" {
+		return fmt.Errorf("database_url is required")
 	}
 
 	// Validate log level
@@ -131,7 +139,7 @@ func (c *Config) LogConfig(logger *zap.Logger) {
 		zap.String("app_version", c.AppVersion),
 		zap.String("log_level", c.LogLevel),
 		zap.Int("http_port", c.HTTPPort),
-		zap.String("session_path", c.WhatsApp.SessionPath),
+		zap.String("database_url", c.DatabaseURL),
 		zap.Bool("history_sync", c.WhatsApp.HistorySync),
 		zap.Bool("dev_mode", c.Dev.EnablePprof || c.Dev.QRInTerminal),
 	)
