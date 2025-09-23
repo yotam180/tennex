@@ -1,0 +1,107 @@
+# Tennex Authentication Flow - Advanced Tests
+# This demonstrates variable capture and reuse in REST Client
+
+### Variables
+@baseUrl = http://localhost:6000
+@contentType = application/json
+
+### 1. Health Check
+GET {{baseUrl}}/health
+
+###
+
+### 2. Register a test user
+# @name registerUser
+POST {{baseUrl}}/auth/register
+Content-Type: {{contentType}}
+
+{
+  "username": "testuser_{{$randomInt 1000 9999}}",
+  "email": "testuser{{$randomInt 1000 9999}}@example.com",
+  "password": "password123",
+  "full_name": "Test User"
+}
+
+###
+
+### 3. Login with the user (copy username/email from above response)
+# @name loginUser
+POST {{baseUrl}}/auth/login
+Content-Type: {{contentType}}
+
+{
+  "username": "testuser_1234",
+  "password": "password123"
+}
+
+###
+
+### 4. Use the token from login response to access protected endpoint
+# @name getCurrentUser
+GET {{baseUrl}}/auth/me
+Authorization: Bearer {{loginUser.response.body.token}}
+
+###
+
+### 5. Complete flow with variables (register → login → get profile)
+# Step A: Register
+# @name flowRegister
+POST {{baseUrl}}/auth/register
+Content-Type: {{contentType}}
+
+{
+  "username": "flowuser",
+  "email": "flow@example.com",
+  "password": "password123",
+  "full_name": "Flow Test User"
+}
+
+### Step B: Login using registered username
+# @name flowLogin
+POST {{baseUrl}}/auth/login
+Content-Type: {{contentType}}
+
+{
+  "username": "flowuser",
+  "password": "password123"
+}
+
+### Step C: Access profile using token from login
+GET {{baseUrl}}/auth/me
+Authorization: Bearer {{flowLogin.response.body.token}}
+
+###
+
+### 6. Test different scenarios
+
+# Test with environment variables for different environments
+@baseUrl = {{$dotenv DEV_API_URL}}
+
+### Development environment health check
+GET {{baseUrl}}/health
+
+###
+
+# Revert to localhost
+@baseUrl = http://localhost:6000
+
+### 7. Performance test - Multiple rapid requests
+POST {{baseUrl}}/auth/register
+Content-Type: {{contentType}}
+
+{
+  "username": "perf{{$timestamp}}",
+  "email": "perf{{$timestamp}}@example.com", 
+  "password": "password123"
+}
+
+###
+
+POST {{baseUrl}}/auth/register
+Content-Type: {{contentType}}
+
+{
+  "username": "perf{{$timestamp}}", 
+  "email": "perf{{$timestamp}}@example.com",
+  "password": "password123"
+}

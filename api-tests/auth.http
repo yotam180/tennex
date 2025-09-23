@@ -1,0 +1,122 @@
+# Tennex Authentication API Tests
+# Use with REST Client extension in VSCode
+# Click "Send Request" above each request to execute
+
+### Variables
+@baseUrl = http://localhost:6000
+@contentType = application/json
+
+### Health Check
+GET {{baseUrl}}/health
+
+### 1. Register a new user
+POST {{baseUrl}}/auth/register
+Content-Type: {{contentType}}
+
+{
+  "username": "johndoe",
+  "email": "john@example.com",
+  "password": "password123",
+  "full_name": "John Doe"
+}
+
+### 2. Register another user (for testing duplicates)
+POST {{baseUrl}}/auth/register
+Content-Type: {{contentType}}
+
+{
+  "username": "janedoe", 
+  "email": "jane@example.com",
+  "password": "securepass456",
+  "full_name": "Jane Doe"
+}
+
+### 3. Try to register duplicate username (should fail)
+POST {{baseUrl}}/auth/register
+Content-Type: {{contentType}}
+
+{
+  "username": "johndoe",
+  "email": "john2@example.com", 
+  "password": "password123",
+  "full_name": "John Two"
+}
+
+### 4. Try to register duplicate email (should fail)
+POST {{baseUrl}}/auth/register
+Content-Type: {{contentType}}
+
+{
+  "username": "john2",
+  "email": "john@example.com",
+  "password": "password123", 
+  "full_name": "John Two"
+}
+
+### 5. Login with username
+POST {{baseUrl}}/auth/login
+Content-Type: {{contentType}}
+
+{
+  "username": "johndoe",
+  "password": "password123"
+}
+
+### 6. Login with email
+POST {{baseUrl}}/auth/login
+Content-Type: {{contentType}}
+
+{
+  "username": "jane@example.com",
+  "password": "securepass456"
+}
+
+### 7. Login with wrong password (should fail)
+POST {{baseUrl}}/auth/login
+Content-Type: {{contentType}}
+
+{
+  "username": "johndoe",
+  "password": "wrongpassword"
+}
+
+### 8. Get current user info (replace TOKEN with actual JWT from login response)
+GET {{baseUrl}}/auth/me
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3NTg3NTMwNDUsImlhdCI6MTc1ODY2NjY0NSwidXNlcl9pZCI6IjhmYzEzMWU2LTM0ZTgtNGUwZC04NjljLTdhY2Q1ZGExMDExMSJ9.n7vQBc7ZEvw_mO9upkHZ0ZlQGG8pduULuYJP2ibY5PM
+
+### 9. Test invalid token (should fail)
+GET {{baseUrl}}/auth/me
+Authorization: Bearer invalid-token-here
+
+### 10. Test missing token (should fail)
+GET {{baseUrl}}/auth/me
+
+### 11. Register with minimal data (no full_name)
+POST {{baseUrl}}/auth/register
+Content-Type: {{contentType}}
+
+{
+  "username": "minimal", 
+  "email": "minimal@example.com",
+  "password": "password123"
+}
+
+### 12. Test password too short (should fail)
+POST {{baseUrl}}/auth/register
+Content-Type: {{contentType}}
+
+{
+  "username": "shortpass",
+  "email": "short@example.com", 
+  "password": "123"
+}
+
+### 13. Test invalid email format (should fail)
+POST {{baseUrl}}/auth/register
+Content-Type: {{contentType}}
+
+{
+  "username": "invalidemail",
+  "email": "not-an-email",
+  "password": "password123"
+}
