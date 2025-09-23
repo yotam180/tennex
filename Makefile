@@ -1,7 +1,7 @@
 # Tennex - WhatsApp Bridge Platform
 # Development tooling and workflow automation
 
-.PHONY: help dev gen migrate test lint clean docker-up docker-down
+.PHONY: help dev gen migrate migrate-all db-reset test lint clean docker-up docker-down
 
 # Default target
 help: ## Show this help message
@@ -20,6 +20,7 @@ dev-infra: docker-up ## Start infrastructure only (for local development)
 	@echo ""
 	@echo "🔧 Next steps for local development:"
 	@echo "  make gen                    # Generate contracts"
+	@echo "  make migrate                # Apply database migrations"
 	@echo "  cd services/backend && go run cmd/backend/main.go     # Port 6000"
 	@echo "  cd services/eventstream && go run cmd/eventstream/main.go # Port 6002"
 	@echo "  cd services/bridge && go run main.go                  # Port 6003"
@@ -45,7 +46,24 @@ gen: ## Generate code from contracts (OpenAPI, protobuf, sqlc)
 
 migrate: ## Run database migrations
 	@echo "📊 Running database migrations..."
-	@echo "TODO: Implement migration runner"
+	@echo "Applying schema files to local database..."
+	@PGPASSWORD=tennex123 psql -h localhost -p 5432 -U tennex -d tennex -f pkg/db/schema/001_initial_schema.sql
+	@echo "✅ Migrations completed successfully"
+
+migrate-all: ## Run all database migrations (useful for new schema files)
+	@echo "📊 Running all database migrations..."
+	@for file in pkg/db/schema/*.sql; do \
+		echo "Applying $$file..."; \
+		PGPASSWORD=tennex123 psql -h localhost -p 5432 -U tennex -d tennex -f "$$file"; \
+	done
+	@echo "✅ All migrations completed successfully"
+
+db-reset: ## Reset database (drop and recreate all tables)
+	@echo "🔄 Resetting database..."
+	@echo "⚠️  This will destroy all data!"
+	@PGPASSWORD=tennex123 psql -h localhost -p 5432 -U tennex -d tennex -c "DROP SCHEMA IF EXISTS public CASCADE; CREATE SCHEMA public;"
+	@$(MAKE) migrate-all
+	@echo "✅ Database reset completed"
 
 test: ## Run tests with dockertest
 	@echo "🧪 Running tests..."
