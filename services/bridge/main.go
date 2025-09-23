@@ -9,6 +9,7 @@ import (
 	"syscall"
 
 	"github.com/gin-gonic/gin"
+	"github.com/tennex/bridge/db"
 	"github.com/tennex/bridge/whatsapp"
 )
 
@@ -29,48 +30,45 @@ func main() {
 
 	fmt.Println("🚀 Starting Tennex WhatsApp Bridge HTTP Server...")
 
-	// Setup Gin router
-	gin.SetMode(gin.ReleaseMode) // Reduce logging noise
+	storage, err := db.NewStorage()
+	if err != nil {
+		fmt.Printf("❌ Failed to create storage: %v\n", err)
+		os.Exit(1)
+	}
+
+	whatsappConnector := whatsapp.NewWhatsAppConnector(storage)
+
+	gin.SetMode(gin.DebugMode)
 	router := gin.Default()
-
-	// Health check endpoint
-	router.GET("/health", func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{
-			"status":  "healthy",
-			"service": "tennex-whatsapp-bridge",
-		})
-	})
-
-	// WhatsApp connection endpoint
 	router.POST("/connect", func(c *gin.Context) {
-		fmt.Println("📱 WhatsApp connection request received...")
-
-		// Call our whatsapp connection function
-		if err := whatsapp.ConnectToWhatsApp(ctx); err != nil {
-			fmt.Printf("❌ WhatsApp connection failed: %v\n", err)
-			c.JSON(http.StatusInternalServerError, gin.H{
-				"error": fmt.Sprintf("WhatsApp connection failed: %v", err),
-			})
-			return
-		}
-
-		fmt.Println("🎉 WhatsApp connection completed successfully!")
-		c.JSON(http.StatusOK, gin.H{
-			"status":  "success",
-			"message": "WhatsApp connection completed successfully",
-		})
+		createWhatsappConnection(c, whatsappConnector, ctx)
 	})
 
-	// Start HTTP server
-	port := ":8081"
-	fmt.Printf("🌐 HTTP Server starting on port %s\n", port)
-	fmt.Printf("📋 Endpoints:\n")
-	fmt.Printf("   GET  /health  - Health check\n")
-	fmt.Printf("   POST /connect - Start WhatsApp connection\n")
-	fmt.Printf("\n💡 To connect WhatsApp: curl -X POST http://localhost:8080/connect\n")
-
-	if err := router.Run(port); err != nil {
+	if err := router.Run(":8081"); err != nil {
 		fmt.Printf("❌ Failed to start HTTP server: %v\n", err)
 		os.Exit(1)
 	}
+}
+
+func createWhatsappConnection(c *gin.Context, whatsappConnector *whatsapp.WhatsAppConnector, ctx context.Context) {
+	accountID := c.Query("account_id")
+	if accountID == "" {
+		accountID = "sample-account-id" // TODO: Remove this logic
+	}
+
+	qrChan := make(chan whatsapp.QRCodeData, 1)
+
+	if err := whatsappConnector.RunWhatsAppConnectionFlow(ctx, accountID, qrChan); err != nil {
+		fmt.Printf("❌ WhatsApp connection failed: %v\n", err)
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": fmt.Sprintf("WhatsApp connection failed: %v", err),
+		})
+		return
+	}
+
+	qrCode := <-qrChan
+
+	c.JSON(http.StatusOK, gin.H{
+		"qr_code": qrCode,
+	})
 }
