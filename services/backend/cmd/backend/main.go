@@ -83,7 +83,17 @@ func main() {
 		zap.Int("grpc_port", config.GRPC.Port))
 
 	// Setup database connection
-	dbPool, err := setupDatabase(ctx, config.Database, logger)
+	dbPool, err := setupDatabase(ctx, struct {
+		URL             string
+		MaxConns        int
+		MinConns        int
+		MaxConnLifetime string
+	}{
+		URL:             config.Database.URL,
+		MaxConns:        config.Database.MaxConns,
+		MinConns:        config.Database.MinConns,
+		MaxConnLifetime: config.Database.MaxConnLifetime,
+	}, logger)
 	if err != nil {
 		logger.Fatal("Failed to setup database", zap.Error(err))
 	}
@@ -113,7 +123,14 @@ func main() {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		if err := runHTTPServer(ctx, config.HTTP, eventService, outboxService, accountService, logger); err != nil {
+		httpConfig := struct {
+			Port int
+			Host string
+		}{
+			Port: config.HTTP.Port,
+			Host: config.HTTP.Host,
+		}
+		if err := runHTTPServer(ctx, httpConfig, eventService, outboxService, accountService, logger); err != nil {
 			logger.Error("HTTP server error", zap.Error(err))
 		}
 	}()
@@ -122,7 +139,14 @@ func main() {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		if err := runGRPCServer(ctx, config.GRPC, eventService, outboxService, accountService, logger); err != nil {
+		grpcConfig := struct {
+			Port int
+			Host string
+		}{
+			Port: config.GRPC.Port,
+			Host: config.GRPC.Host,
+		}
+		if err := runGRPCServer(ctx, grpcConfig, eventService, outboxService, accountService, logger); err != nil {
 			logger.Error("gRPC server error", zap.Error(err))
 		}
 	}()
@@ -337,7 +361,7 @@ func runGRPCServer(ctx context.Context, grpcConfig struct {
 	}
 
 	grpcServer := grpc.NewServer()
-	bridgeServer := server.NewBridgeServer(eventService, outboxService, accountService, logger)
+	_ = server.NewBridgeServer(eventService, outboxService, accountService, logger)
 
 	// Register service (TODO: replace with generated registration)
 	// bridgev1.RegisterBridgeServiceServer(grpcServer, bridgeServer)

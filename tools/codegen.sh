@@ -43,7 +43,7 @@ fi
 # Generate OpenAPI code
 echo -e "${YELLOW}🔧 Generating OpenAPI code...${NC}"
 if [ -f "pkg/api/openapi.yaml" ]; then
-    oapi-codegen -config pkg/api/oapi-codegen.yaml pkg/api/openapi.yaml > pkg/api/gen/api.go
+    oapi-codegen -package api -generate types,chi-server,spec -o pkg/api/gen/api.go pkg/api/openapi.yaml
     echo -e "${GREEN}✅ OpenAPI generation complete${NC}"
 else
     echo -e "${YELLOW}⚠️  Skipping OpenAPI generation (openapi.yaml not found)${NC}"

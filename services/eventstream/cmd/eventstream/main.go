@@ -84,7 +84,14 @@ func main() {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		if err := runHTTPServer(ctx, config.HTTP, streamManager, logger); err != nil {
+		httpConfig := struct {
+			Port int
+			Host string
+		}{
+			Port: config.HTTP.Port,
+			Host: config.HTTP.Host,
+		}
+		if err := runHTTPServer(ctx, httpConfig, streamManager, logger); err != nil {
 			logger.Error("HTTP server error", zap.Error(err))
 		}
 	}()

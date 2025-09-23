@@ -4,10 +4,9 @@ FROM golang:1.22-alpine AS builder
 WORKDIR /app
 
 # Copy go mod files
-COPY go.work go.work.sum ./
-COPY services/backend/go.mod services/backend/go.sum ./services/backend/
-COPY services/eventstream/go.mod services/eventstream/go.sum ./services/eventstream/
-COPY services/bridge/go.mod services/bridge/go.sum ./services/bridge/
+COPY go.work* ./
+COPY services/backend/go.mod services/backend/go.su[m] ./services/backend/
+COPY services/eventstream/go.mod services/eventstream/go.su[m] ./services/eventstream/
 
 # Copy pkg directory for shared dependencies
 COPY pkg/ ./pkg/

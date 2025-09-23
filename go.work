@@ -1,8 +1,7 @@
 go 1.22
 
 use (
-	./services/bridge
+	./pkg
 	./services/backend
 	./services/eventstream
-	./test
 )
