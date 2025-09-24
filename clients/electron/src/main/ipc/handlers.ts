@@ -19,7 +19,8 @@ export function registerIpcHandlers(db: ReturnType<typeof drizzle<typeof schema>
       });
 
       if (!response.ok) {
-        throw new Error('Login failed');
+        const errorData = await response.text();
+        throw new Error(`Login failed: ${response.status} ${errorData}`);
       }
 
       const authData = await response.json() as any;
@@ -36,7 +37,66 @@ export function registerIpcHandlers(db: ReturnType<typeof drizzle<typeof schema>
 
       return authData;
     } catch (error) {
-      throw new Error(`Login failed: ${error}`);
+      throw new Error(`Login failed: ${error instanceof Error ? error.message : error}`);
+    }
+  });
+
+  ipcMain.handle('auth:register', async (_, userData: {
+    username: string;
+    password: string;
+    email: string;
+    full_name?: string;
+  }) => {
+    try {
+      const response = await fetch(`${getBackendUrl()}/auth/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(userData),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.text();
+        throw new Error(`Registration failed: ${response.status} ${errorData}`);
+      }
+
+      const authData = await response.json() as any;
+      
+      // Initialize sync service with auth token
+      const syncService = new SyncService({
+        backendUrl: getBackendUrl(),
+        authToken: authData.token,
+        syncIntervalMs: getSyncInterval(),
+      });
+      
+      setSyncService(syncService);
+      await syncService.start();
+
+      return authData;
+    } catch (error) {
+      throw new Error(`Registration failed: ${error instanceof Error ? error.message : error}`);
+    }
+  });
+
+  ipcMain.handle('auth:me', async () => {
+    try {
+      // TODO: Implement token storage and retrieval
+      // For now, this endpoint won't work without token management
+      throw new Error('Token management not yet implemented');
+      
+      // const response = await fetch(`${getBackendUrl()}/auth/me`, {
+      //   headers: {
+      //     'Authorization': `Bearer ${storedToken}`,
+      //     'Content-Type': 'application/json',
+      //   },
+      // });
+
+      // if (!response.ok) {
+      //   throw new Error('Failed to get current user');
+      // }
+
+      // return await response.json();
+    } catch (error) {
+      throw new Error(`Failed to get current user: ${error instanceof Error ? error.message : error}`);
     }
   });
 

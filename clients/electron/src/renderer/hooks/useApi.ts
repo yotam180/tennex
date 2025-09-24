@@ -31,6 +31,29 @@ export function useLogin() {
   });
 }
 
+export function useRegister() {
+  return useMutation({
+    mutationFn: async (userData: {
+      username: string;
+      password: string;
+      email: string;
+      full_name?: string;
+    }) => {
+      return await window.electronAPI.invoke('auth:register', userData);
+    },
+  });
+}
+
+export function useCurrentUser() {
+  return useQuery({
+    queryKey: ['auth', 'me'],
+    queryFn: async () => {
+      return await window.electronAPI.invoke('auth:me');
+    },
+    retry: false, // Don't retry if token is invalid
+  });
+}
+
 export function useGetQRCode(accountId: string) {
   return useQuery({
     queryKey: ['qr', accountId],
