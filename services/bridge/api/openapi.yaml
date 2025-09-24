@@ -1,0 +1,287 @@
+openapi: 3.1.0
+info:
+  title: Tennex Bridge API
+  description: Multi-platform messaging bridge service
+  version: 1.0.0
+  contact:
+    name: Tennex Team
+servers:
+  - url: http://localhost:6003
+    description: Local development server
+
+security:
+  - bearerAuth: []
+
+paths:
+  /health:
+    get:
+      summary: Health check
+      operationId: getHealth
+      tags:
+        - System
+      security: []  # Health check doesn't require auth
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+
+  /whatsapp/connect:
+    post:
+      summary: Connect WhatsApp account
+      operationId: connectWhatsApp
+      tags:
+        - WhatsApp
+      responses:
+        '200':
+          description: QR code for WhatsApp connection
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WhatsAppConnectResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /whatsapp/status:
+    get:
+      summary: Get WhatsApp connection status
+      operationId: getWhatsAppStatus
+      tags:
+        - WhatsApp
+      responses:
+        '200':
+          description: WhatsApp connection status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WhatsAppStatusResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /whatsapp/disconnect:
+    post:
+      summary: Disconnect WhatsApp account
+      operationId: disconnectWhatsApp
+      tags:
+        - WhatsApp
+      responses:
+        '200':
+          description: WhatsApp disconnected successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /connections:
+    get:
+      summary: List all user's messaging platform connections
+      operationId: listConnections
+      tags:
+        - Connections
+      responses:
+        '200':
+          description: List of connections
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConnectionsResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    HealthResponse:
+      type: object
+      required:
+        - status
+        - timestamp
+      properties:
+        status:
+          type: string
+          example: "ok"
+        timestamp:
+          type: string
+          format: date-time
+        version:
+          type: string
+          example: "1.0.0"
+
+    WhatsAppConnectResponse:
+      type: object
+      required:
+        - qr_code
+        - session_id
+      properties:
+        qr_code:
+          type: string
+          description: QR code data for WhatsApp connection
+          example: "2@BQcGFzYX..."
+        session_id:
+          type: string
+          format: uuid
+          description: Unique session identifier for this connection attempt
+        expires_at:
+          type: string
+          format: date-time
+          description: When the QR code expires
+        instructions:
+          type: string
+          description: Human-readable instructions
+          example: "Scan this QR code with WhatsApp on your phone"
+
+    WhatsAppStatusResponse:
+      type: object
+      required:
+        - connected
+        - user_id
+      properties:
+        connected:
+          type: boolean
+          description: Whether WhatsApp is connected
+        user_id:
+          type: string
+          format: uuid
+          description: User ID this connection belongs to
+        whatsapp_jid:
+          type: string
+          description: WhatsApp JID if connected
+          example: "1234567890@s.whatsapp.net"
+        display_name:
+          type: string
+          description: WhatsApp display name
+        avatar_url:
+          type: string
+          description: WhatsApp profile picture URL
+        connected_at:
+          type: string
+          format: date-time
+          description: When the connection was established
+        last_seen:
+          type: string
+          format: date-time
+          description: Last activity timestamp
+
+    Connection:
+      type: object
+      required:
+        - platform
+        - connected
+        - user_id
+      properties:
+        platform:
+          type: string
+          enum: [whatsapp, telegram, discord]
+          description: Messaging platform name
+        connected:
+          type: boolean
+          description: Connection status
+        user_id:
+          type: string
+          format: uuid
+          description: User ID this connection belongs to
+        platform_user_id:
+          type: string
+          description: User identifier on the messaging platform
+        display_name:
+          type: string
+          description: Display name on the platform
+        avatar_url:
+          type: string
+          description: Profile picture URL
+        connected_at:
+          type: string
+          format: date-time
+          description: When connection was established
+        last_seen:
+          type: string
+          format: date-time
+          description: Last activity timestamp
+        metadata:
+          type: object
+          description: Platform-specific metadata
+          additionalProperties: true
+
+    ConnectionsResponse:
+      type: object
+      required:
+        - connections
+        - user_id
+      properties:
+        connections:
+          type: array
+          items:
+            $ref: '#/components/schemas/Connection'
+        user_id:
+          type: string
+          format: uuid
+          description: User ID these connections belong to
+        total:
+          type: integer
+          description: Total number of connections
+
+    SuccessResponse:
+      type: object
+      required:
+        - success
+        - message
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: "Operation completed successfully"
+        timestamp:
+          type: string
+          format: date-time
+
+    ErrorResponse:
+      type: object
+      required:
+        - error
+        - timestamp
+      properties:
+        error:
+          type: string
+          description: Error message
+        code:
+          type: string
+          description: Error code
+        details:
+          type: object
+          description: Additional error details
+        timestamp:
+          type: string
+          format: date-time

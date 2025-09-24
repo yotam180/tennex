@@ -1,0 +1,67 @@
+# Complete JWT + WhatsApp Integration Demo
+# This demonstrates the complete flow from authentication to WhatsApp connection
+
+### Prerequisites: Start the services
+# 1. Start infrastructure: make docker-up (or start Docker manually)
+# 2. Start backend: ./tools/dev-backend.sh (or cd services/backend && go run cmd/backend/main.go)
+# 3. Start bridge: cd services/bridge && ./bridge
+
+### Step 1: Register a new user on backend
+# @name registerUser
+POST http://localhost:6000/auth/register
+Content-Type: application/json
+
+{
+  "username": "whatsapp_user",
+  "email": "whatsapp@example.com", 
+  "password": "password123",
+  "full_name": "WhatsApp Demo User"
+}
+
+### Step 2: Login to get JWT token
+# @name loginUser
+POST http://localhost:6000/auth/login
+Content-Type: application/json
+
+{
+  "username": "whatsapp_user",
+  "password": "password123"
+}
+
+### Step 3: Check bridge health (no auth required)
+GET http://localhost:6003/health
+
+### Step 4: Check WhatsApp status (should show not connected)
+GET http://localhost:6003/whatsapp/status
+Authorization: Bearer {{loginUser.response.body.token}}
+
+### Step 5: Connect WhatsApp (will return QR code)
+# @name connectWhatsApp
+POST http://localhost:6003/whatsapp/connect
+Authorization: Bearer {{loginUser.response.body.token}}
+
+### Step 6: Check WhatsApp status after scanning QR
+GET http://localhost:6003/whatsapp/status  
+Authorization: Bearer {{loginUser.response.body.token}}
+
+### Step 7: List all connections
+GET http://localhost:6003/connections
+Authorization: Bearer {{loginUser.response.body.token}}
+
+### Step 8: Disconnect WhatsApp
+POST http://localhost:6003/whatsapp/disconnect
+Authorization: Bearer {{loginUser.response.body.token}}
+
+### Error scenarios to test:
+
+### Try accessing without JWT (should fail with 401)
+GET http://localhost:6003/whatsapp/status
+
+### Try with invalid JWT (should fail with 401)
+GET http://localhost:6003/whatsapp/status
+Authorization: Bearer invalid-jwt-token
+
+### Try with expired JWT (should fail with 401)  
+GET http://localhost:6003/whatsapp/status
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.expired.token
+

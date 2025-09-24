@@ -74,12 +74,16 @@ func (c *WhatsAppConnector) RunWhatsAppConnectionFlow(ctx context.Context, accou
 				if client.Store != nil && client.Store.ID != nil {
 					jid = client.Store.ID.String()
 				}
-				fmt.Printf("\nQR scan successful. Session established. JID: %s\n", jid)
+				fmt.Printf("\n🎉 QR scan successful! Session established.\n")
+				fmt.Printf("👤 User ID: %s\n", accountID)
+				fmt.Printf("📱 WhatsApp JID: %s\n", jid)
 
 				if err := c.storage.SetJIDForAccount(ctx, accountID, jid); err != nil {
-					fmt.Printf("failed to set JID for account: %v\n", err)
+					fmt.Printf("❌ Failed to set JID for account: %v\n", err)
 					return
 				}
+
+				fmt.Printf("✅ Connection saved successfully!\n")
 			}
 		}
 

@@ -5,5 +5,6 @@ toolchain go1.24.6
 use (
 	./pkg
 	./services/backend
+	./services/bridge
 	./services/eventstream
 )

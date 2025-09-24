@@ -42,11 +42,21 @@ fi
 
 # Generate OpenAPI code
 echo -e "${YELLOW}🔧 Generating OpenAPI code...${NC}"
+
+# Backend API generation
 if [ -f "pkg/api/openapi.yaml" ]; then
     oapi-codegen -package api -generate types,chi-server,spec -o pkg/api/gen/api.go pkg/api/openapi.yaml
-    echo -e "${GREEN}✅ OpenAPI generation complete${NC}"
+    echo -e "${GREEN}✅ Backend OpenAPI generation complete${NC}"
 else
-    echo -e "${YELLOW}⚠️  Skipping OpenAPI generation (openapi.yaml not found)${NC}"
+    echo -e "${YELLOW}⚠️  Skipping Backend OpenAPI generation (pkg/api/openapi.yaml not found)${NC}"
+fi
+
+# Bridge API generation
+if [ -f "services/bridge/api/openapi.yaml" ]; then
+    oapi-codegen -package api -generate types,chi-server,spec -o services/bridge/api/gen/api.go services/bridge/api/openapi.yaml
+    echo -e "${GREEN}✅ Bridge OpenAPI generation complete${NC}"
+else
+    echo -e "${YELLOW}⚠️  Skipping Bridge OpenAPI generation (services/bridge/api/openapi.yaml not found)${NC}"
 fi
 
 # Generate sqlc code

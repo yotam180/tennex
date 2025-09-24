@@ -1,0 +1,217 @@
+package handlers
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"net/http"
+	"time"
+
+	"github.com/go-chi/chi/v5"
+	"github.com/google/uuid"
+	api "github.com/tennex/bridge/api/gen"
+	"github.com/tennex/bridge/db"
+	"github.com/tennex/bridge/whatsapp"
+	"github.com/tennex/shared/auth"
+)
+
+type WhatsAppHandler struct {
+	storage           *db.Storage
+	whatsappConnector *whatsapp.WhatsAppConnector
+}
+
+func NewWhatsAppHandler(storage *db.Storage, whatsappConnector *whatsapp.WhatsAppConnector) *WhatsAppHandler {
+	return &WhatsAppHandler{
+		storage:           storage,
+		whatsappConnector: whatsappConnector,
+	}
+}
+
+// Routes sets up WhatsApp-specific routes
+func (h *WhatsAppHandler) Routes() chi.Router {
+	r := chi.NewRouter()
+
+	// All WhatsApp routes require authentication
+	r.Use(func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// Ensure user is authenticated (JWT middleware should have run first)
+			userID, err := auth.GetUserIDFromContext(r.Context())
+			if err != nil {
+				h.writeError(w, http.StatusUnauthorized, "authentication_required", "User must be authenticated", nil)
+				return
+			}
+
+			// Add user ID to context for convenience
+			ctx := context.WithValue(r.Context(), "user_id", userID.String())
+			next.ServeHTTP(w, r.WithContext(ctx))
+		})
+	})
+
+	r.Post("/connect", h.ConnectWhatsApp)
+	r.Get("/status", h.GetWhatsAppStatus)
+	r.Post("/disconnect", h.DisconnectWhatsApp)
+
+	return r
+}
+
+// ConnectWhatsApp implements POST /whatsapp/connect
+func (h *WhatsAppHandler) ConnectWhatsApp(w http.ResponseWriter, r *http.Request) {
+	// Get authenticated user ID
+	userIDStr, ok := r.Context().Value("user_id").(string)
+	if !ok {
+		h.writeError(w, http.StatusInternalServerError, "context_error", "Failed to get user ID from context", nil)
+		return
+	}
+
+	userID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		h.writeError(w, http.StatusBadRequest, "invalid_user_id", "Invalid user ID format", nil)
+		return
+	}
+
+	fmt.Printf("🔐 User %s requesting WhatsApp connection\n", userID)
+
+	// Check if user already has a WhatsApp connection
+	existingJID, err := h.storage.GetJIDForAccount(r.Context(), userIDStr)
+	if err != nil {
+		h.writeError(w, http.StatusInternalServerError, "database_error", "Failed to check existing connections", nil)
+		return
+	}
+
+	if existingJID != "" {
+		fmt.Printf("⚠️  User %s already has WhatsApp connection: %s\n", userID, existingJID)
+		h.writeError(w, http.StatusConflict, "already_connected", "WhatsApp account already connected", map[string]interface{}{
+			"existing_jid": existingJID,
+		})
+		return
+	}
+
+	// Create QR channel for this connection attempt
+	qrChan := make(chan whatsapp.QRCodeData, 1)
+	sessionID := uuid.New()
+
+	fmt.Printf("📱 Starting WhatsApp connection flow for user %s (session: %s)\n", userID, sessionID)
+
+	// Start WhatsApp connection flow in background
+	go func() {
+		if err := h.whatsappConnector.RunWhatsAppConnectionFlow(r.Context(), userIDStr, qrChan); err != nil {
+			fmt.Printf("❌ WhatsApp connection failed for user %s: %v\n", userID, err)
+		}
+	}()
+
+	// Wait for QR code (with timeout)
+	select {
+	case qrCode := <-qrChan:
+		fmt.Printf("📲 QR code generated for user %s\n", userID)
+
+		response := api.WhatsAppConnectResponse{
+			QrCode:       string(qrCode),
+			SessionId:    sessionID,
+			ExpiresAt:    timePtr(time.Now().Add(2 * time.Minute)), // QR codes typically expire quickly
+			Instructions: stringPtr("Open WhatsApp on your phone, tap Menu > Linked Devices > Link a Device, and scan this QR code"),
+		}
+
+		h.writeJSON(w, http.StatusOK, response)
+
+	case <-time.After(30 * time.Second):
+		fmt.Printf("⏰ QR code generation timeout for user %s\n", userID)
+		h.writeError(w, http.StatusRequestTimeout, "qr_timeout", "QR code generation timed out", nil)
+
+	case <-r.Context().Done():
+		fmt.Printf("🚫 Request cancelled for user %s\n", userID)
+		h.writeError(w, http.StatusRequestTimeout, "request_cancelled", "Request was cancelled", nil)
+	}
+}
+
+// GetWhatsAppStatus implements GET /whatsapp/status
+func (h *WhatsAppHandler) GetWhatsAppStatus(w http.ResponseWriter, r *http.Request) {
+	// Get authenticated user ID
+	userIDStr, ok := r.Context().Value("user_id").(string)
+	if !ok {
+		h.writeError(w, http.StatusInternalServerError, "context_error", "Failed to get user ID from context", nil)
+		return
+	}
+
+	userID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		h.writeError(w, http.StatusBadRequest, "invalid_user_id", "Invalid user ID format", nil)
+		return
+	}
+
+	// Check WhatsApp connection
+	whatsappJID, err := h.storage.GetJIDForAccount(r.Context(), userIDStr)
+	if err != nil {
+		h.writeError(w, http.StatusInternalServerError, "database_error", "Failed to check WhatsApp connection", nil)
+		return
+	}
+
+	response := api.WhatsAppStatusResponse{
+		Connected: whatsappJID != "",
+		UserId:    userID,
+	}
+
+	if whatsappJID != "" {
+		response.WhatsappJid = &whatsappJID
+		// TODO: Add display_name, avatar_url, connected_at, last_seen when available
+	}
+
+	fmt.Printf("📊 WhatsApp status for user %s: connected=%v\n", userID, response.Connected)
+	h.writeJSON(w, http.StatusOK, response)
+}
+
+// DisconnectWhatsApp implements POST /whatsapp/disconnect
+func (h *WhatsAppHandler) DisconnectWhatsApp(w http.ResponseWriter, r *http.Request) {
+	// Get authenticated user ID
+	userIDStr, ok := r.Context().Value("user_id").(string)
+	if !ok {
+		h.writeError(w, http.StatusInternalServerError, "context_error", "Failed to get user ID from context", nil)
+		return
+	}
+
+	userID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		h.writeError(w, http.StatusBadRequest, "invalid_user_id", "Invalid user ID format", nil)
+		return
+	}
+
+	// Remove WhatsApp connection
+	if err := h.storage.DeleteAccountConnection(r.Context(), userIDStr, "whatsapp"); err != nil {
+		h.writeError(w, http.StatusInternalServerError, "database_error", "Failed to disconnect WhatsApp", nil)
+		return
+	}
+
+	fmt.Printf("🔌 WhatsApp disconnected for user %s\n", userID)
+
+	response := api.SuccessResponse{
+		Success:   true,
+		Message:   "WhatsApp disconnected successfully",
+		Timestamp: timePtr(time.Now()),
+	}
+
+	h.writeJSON(w, http.StatusOK, response)
+}
+
+// Helper functions
+func (h *WhatsAppHandler) writeJSON(w http.ResponseWriter, status int, data interface{}) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	json.NewEncoder(w).Encode(data)
+}
+
+func (h *WhatsAppHandler) writeError(w http.ResponseWriter, status int, code, message string, details map[string]interface{}) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+
+	response := api.ErrorResponse{
+		Error:     message,
+		Code:      &code,
+		Details:   &details,
+		Timestamp: time.Now(),
+	}
+
+	json.NewEncoder(w).Encode(response)
+}
+
+func timePtr(t time.Time) *time.Time {
+	return &t
+}

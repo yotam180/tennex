@@ -1,0 +1,77 @@
+# Tennex Bridge Service API Tests
+# Use with REST Client extension in VSCode
+# This demonstrates JWT-authenticated WhatsApp connection flow
+
+### Variables
+@baseUrl = http://localhost:6003
+@contentType = application/json
+
+# You'll need to get this token from the backend auth system first
+# Use the auth.http file to login and copy the token here
+@authToken = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3NTg3NTM3MjIsImlhdCI6MTc1ODY2NzMyMiwidXNlcl9pZCI6IjE4ZTU1YmY0LTI3YjEtNDMyNi1iODEwLWQ4NTQ0ZDE1MDM5YiJ9.lC_C0p0GFRV4ZmwsY0xW1aHd5bfmH5AQRHOVR_DBhOc
+
+### 1. Health Check (No auth required)
+GET {{baseUrl}}/health
+
+###
+
+### 2. Get WhatsApp Status (Auth required)
+GET {{baseUrl}}/whatsapp/status
+Authorization: Bearer {{authToken}}
+
+###
+
+### 3. Connect WhatsApp Account (Auth required)
+# This will return a QR code that you can scan with your phone
+POST {{baseUrl}}/whatsapp/connect
+Authorization: Bearer {{authToken}}
+
+###
+
+### 4. Get All Connections (Auth required) 
+GET {{baseUrl}}/connections
+Authorization: Bearer {{authToken}}
+
+###
+
+### 5. Disconnect WhatsApp (Auth required)
+POST {{baseUrl}}/whatsapp/disconnect
+Authorization: Bearer {{authToken}}
+
+###
+
+### 6. Test without authentication (should fail)
+GET {{baseUrl}}/whatsapp/status
+
+###
+
+### 7. Test with invalid token (should fail)
+GET {{baseUrl}}/whatsapp/status
+Authorization: Bearer invalid-token-here
+
+###
+
+### Complete Flow Example:
+### Step A: First login to backend to get a valid JWT token
+# @name backendLogin
+POST http://localhost:6000/auth/login
+Content-Type: {{contentType}}
+
+{
+  "username": "curltest",
+  "password": "password123"
+}
+
+### Step B: Use the JWT token from login to connect WhatsApp
+# @name connectWhatsApp
+POST {{baseUrl}}/whatsapp/connect
+Authorization: Bearer {{backendLogin.response.body.token}}
+
+### Step C: Check WhatsApp connection status
+GET {{baseUrl}}/whatsapp/status
+Authorization: Bearer {{backendLogin.response.body.token}}
+
+### Step D: List all connections
+GET {{baseUrl}}/connections  
+Authorization: Bearer {{backendLogin.response.body.token}}
+

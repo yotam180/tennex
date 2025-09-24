@@ -42,7 +42,28 @@ dev: ## Start full environment in Docker (including Go services)
 
 gen: ## Generate code from contracts (OpenAPI, protobuf, sqlc)
 	@echo "🔄 Generating code from contracts..."
-	@./tools/codegen.sh
+	@echo "🔧 Generating OpenAPI code for backend..."
+	@if [ -f "pkg/api/openapi.yaml" ]; then \
+		oapi-codegen -package api -generate types,chi-server,spec -o pkg/api/gen/api.go pkg/api/openapi.yaml; \
+		echo "✅ Backend OpenAPI generation complete"; \
+	else \
+		echo "⚠️  Skipping Backend OpenAPI generation (pkg/api/openapi.yaml not found)"; \
+	fi
+	@echo "🔧 Generating OpenAPI code for bridge..."
+	@if [ -f "services/bridge/api/openapi.yaml" ]; then \
+		oapi-codegen -package api -generate types,chi-server,spec -o services/bridge/api/gen/api.go services/bridge/api/openapi.yaml; \
+		echo "✅ Bridge OpenAPI generation complete"; \
+	else \
+		echo "⚠️  Skipping Bridge OpenAPI generation (services/bridge/api/openapi.yaml not found)"; \
+	fi
+	@echo "🔧 Generating sqlc code..."
+	@if [ -f "pkg/db/sqlc.yaml" ] && [ -d "pkg/db/queries" ]; then \
+		sqlc generate -f pkg/db/sqlc.yaml; \
+		echo "✅ sqlc generation complete"; \
+	else \
+		echo "⚠️  Skipping sqlc generation (sqlc.yaml or queries not found)"; \
+	fi
+	@echo "🎉 Code generation complete!"
 
 migrate: ## Run database migrations
 	@echo "📊 Running database migrations..."
