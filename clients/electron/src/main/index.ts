@@ -8,7 +8,7 @@ import { logConfig } from '../shared/config.js';
 let mainWindow: BrowserWindow | null = null;
 let syncService: SyncService | null = null;
 
-const isDev = process.env.NODE_ENV === 'development';
+const isDev = process.env.NODE_ENV !== 'production';
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -26,10 +26,15 @@ function createWindow() {
   });
 
   // Load the app
+  console.log('isDev:', isDev, 'NODE_ENV:', process.env.NODE_ENV);
+  
   if (isDev) {
+    // Load from Vite dev server - always use port 5173 first
+    console.log('Loading from Vite dev server: http://localhost:5173');
     mainWindow.loadURL('http://localhost:5173');
     mainWindow.webContents.openDevTools();
   } else {
+    console.log('Loading from file:', path.join(__dirname, '../renderer/index.html'));
     mainWindow.loadFile(path.join(__dirname, '../renderer/index.html'));
   }
 
