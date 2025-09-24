@@ -9,6 +9,10 @@ import { ErrorBoundary } from './routes/components';
 
 // ----------------------------------------------------------------------
 
+// 🔥 DEBUG: Log the routes being loaded (CORRECT FILE)
+console.log('🔥🔥🔥 CORRECT MAIN.TSX: routesSection loaded:', routesSection);
+console.log('🔥🔥🔥 CORRECT MAIN.TSX: First route:', routesSection[0]);
+
 const router = createBrowserRouter([
   {
     Component: () => (

@@ -8,6 +8,7 @@ import { AuthSplitLayout } from 'src/layouts/auth-split';
 import { SplashScreen } from 'src/components/loading-screen';
 
 import { GuestGuard } from 'src/auth/guard';
+import { APP_CONSTANTS } from '../../constants/app';
 
 // ----------------------------------------------------------------------
 
@@ -28,7 +29,10 @@ const authJwt = {
         <GuestGuard>
           <AuthSplitLayout
             slotProps={{
-              section: { title: 'Hi, Welcome back' },
+              section: { 
+                title: APP_CONSTANTS.WELCOME_MESSAGE, 
+                subtitle: APP_CONSTANTS.TAGLINE 
+              },
             }}
           >
             <Jwt.SignInPage />

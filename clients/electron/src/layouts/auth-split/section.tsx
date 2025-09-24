@@ -78,12 +78,7 @@ export function AuthSplitSection({
         )}
       </div>
 
-      <Box
-        component="img"
-        alt="Dashboard illustration"
-        src={imgUrl}
-        sx={{ width: 1, aspectRatio: '4/3', objectFit: 'cover' }}
-      />
+      {/* Illustration removed for Tennex */}
 
       {!!methods?.length && method && (
         <Box component="ul" sx={{ gap: 2, display: 'flex' }}>

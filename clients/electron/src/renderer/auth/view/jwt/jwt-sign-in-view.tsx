@@ -17,6 +17,7 @@ import { RouterLink } from 'src/routes/components';
 
 import { Iconify } from 'src/components/iconify';
 import { Form, Field } from 'src/components/hook-form';
+import { APP_CONSTANTS } from 'src/constants/app';
 
 import { useAuthContext } from '../../hooks';
 import { getErrorMessage } from '../../utils';
@@ -50,8 +51,8 @@ export function JwtSignInView() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const defaultValues: SignInSchemaType = {
-    username: 'demo_user',
-    password: 'password123',
+    username: '',
+    password: '',
   };
 
   const methods = useForm<SignInSchemaType>({
@@ -131,10 +132,10 @@ export function JwtSignInView() {
   return (
     <>
       <FormHead
-        title="Sign in to your account"
+        title={`Sign in to ${APP_CONSTANTS.PRODUCT_NAME}`}
         description={
           <>
-            {`Don’t have an account? `}
+            {`Don't have an account? `}
             <Link component={RouterLink} href={paths.auth.jwt.signUp} variant="subtitle2">
               Get started
             </Link>
@@ -142,12 +143,6 @@ export function JwtSignInView() {
         }
         sx={{ textAlign: { xs: 'center', md: 'left' } }}
       />
-
-      <Alert severity="info" sx={{ mb: 3 }}>
-        Use <strong>{defaultValues.email}</strong>
-        {' with password '}
-        <strong>{defaultValues.password}</strong>
-      </Alert>
 
       {!!errorMessage && (
         <Alert severity="error" sx={{ mb: 3 }}>

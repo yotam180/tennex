@@ -25,20 +25,27 @@ export function AuthProvider({ children }: Props) {
   const { state, setState } = useSetState<AuthState>({ user: null, loading: true });
 
   const checkUserSession = useCallback(async () => {
+    console.log('🔍 JWT Auth Provider - Checking user session...');
+    
     try {
       const accessToken = localStorage.getItem(JWT_STORAGE_KEY);
+      console.log('🔍 Found token in localStorage:', !!accessToken);
 
       if (accessToken && isValidToken(accessToken)) {
+        console.log('✅ Token is valid, setting session...');
         setSession(accessToken);
 
         try {
+          console.log('🔄 Fetching user details from /auth/me...');
           const res = await axios.get(endpoints.auth.me);
           const { user } = res.data;
+          console.log('✅ User details fetched successfully:', user);
           setState({ user: { ...user, accessToken }, loading: false });
         } catch (error) {
           // If /auth/me fails, still consider user logged in with token info
-          console.warn('Could not fetch user details, using token info:', error);
+          console.warn('⚠️ Could not fetch user details, using token info:', error);
           const decodedToken = jwtDecode(accessToken);
+          console.log('🔍 Decoded token:', decodedToken);
           setState({ 
             user: { 
               id: decodedToken.sub || decodedToken.user_id,
@@ -50,10 +57,11 @@ export function AuthProvider({ children }: Props) {
           });
         }
       } else {
+        console.log('❌ No valid token found, setting user to null');
         setState({ user: null, loading: false });
       }
     } catch (error) {
-      console.error(error);
+      console.error('🚨 Error in checkUserSession:', error);
       setState({ user: null, loading: false });
     }
   }, [setState]);
@@ -69,16 +77,18 @@ export function AuthProvider({ children }: Props) {
 
   const status = state.loading ? 'loading' : checkAuthenticated;
 
-  const memoizedValue = useMemo(
-    () => ({
+  const memoizedValue = useMemo(() => {
+    const authValue = {
       user: state.user ? { ...state.user, role: state.user?.role ?? 'admin' } : null,
       checkUserSession,
       loading: status === 'loading',
       authenticated: status === 'authenticated',
       unauthenticated: status === 'unauthenticated',
-    }),
-    [checkUserSession, state.user, status]
-  );
+    };
+    
+    console.log('🔍 Auth Context Value:', authValue);
+    return authValue;
+  }, [checkUserSession, state.user, status]);
 
   return <AuthContext.Provider value={memoizedValue}>{children}</AuthContext.Provider>;
 }

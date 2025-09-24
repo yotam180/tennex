@@ -78,28 +78,36 @@ export function HomeHero({ sx, ...other }: BoxProps) {
           },
         ]}
       >
-        <Box component="span" sx={{ width: 1, opacity: 0.24 }}>
-          Boost your building
+        <Box component="span" sx={{ 
+          width: 1, 
+          backgroundColor: 'red', 
+          color: 'white',
+          padding: '20px',
+          borderRadius: '10px',
+          fontWeight: 'bold'
+        }}>
+          🔥 TENNEX TESTING 🔥
         </Box>
-        process with
+        <Box component="span" sx={{ 
+          color: 'lime', 
+          fontWeight: 'bold',
+          fontSize: '2em',
+          ml: 2
+        }}>
+          BUILD SYSTEM WORKS!
+        </Box>
         <Box
           component={m.span}
-          animate={{ backgroundPosition: '200% center' }}
-          transition={{
-            duration: 20,
-            ease: 'linear',
-            repeat: Infinity,
-            repeatType: 'reverse',
-          }}
           sx={{
-            ...theme.mixins.textGradient(
-              `300deg, ${theme.vars.palette.primary.main} 0%, ${theme.vars.palette.warning.main} 25%, ${theme.vars.palette.primary.main} 50%, ${theme.vars.palette.warning.main} 75%, ${theme.vars.palette.primary.main} 100%`
-            ),
-            backgroundSize: '400%',
+            backgroundColor: 'purple',
+            color: 'yellow',
+            padding: '10px',
+            borderRadius: '5px',
+            fontWeight: 'bold',
             ml: { xs: 0.75, md: 1, xl: 1.5 },
           }}
         >
-          Minimal
+          CHANGES DETECTED!
         </Box>
       </Box>
     </m.div>

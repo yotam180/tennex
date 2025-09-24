@@ -11,7 +11,7 @@ import { RouterLink } from 'src/routes/components';
 
 import { CONFIG } from 'src/global-config';
 
-import { Logo } from 'src/components/logo';
+// import { Logo } from 'src/components/logo'; // Removed for Tennex
 
 import { AuthSplitSection } from './section';
 import { AuthSplitContent } from './content';
@@ -60,8 +60,7 @@ export function AuthSplitLayout({
       ),
       leftArea: (
         <>
-          {/** @slot Logo */}
-          <Logo />
+          {/** @slot Logo - Removed for Tennex */}
         </>
       ),
       rightArea: (
