@@ -281,6 +281,9 @@ export const authRoutes: RouteObject[] = [
         <Outlet />
       </Suspense>
     ),
-    children: [authJwt, authAmplify, authFirebase, authAuth0, authSupabase],
+    // Only include JWT auth for Tennex
+    children: [authJwt],
+    // Disabled auth methods - uncomment if needed
+    // children: [authJwt, authAmplify, authFirebase, authAuth0, authSupabase],
   },
 ];

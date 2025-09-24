@@ -17,7 +17,8 @@ import { usePathname } from '../hooks';
 // ----------------------------------------------------------------------
 
 // Overview
-const IndexPage = lazy(() => import('src/pages/dashboard'));
+const IndexPage = lazy(() => import('src/pages/dashboard/tennex-dashboard'));
+// const DefaultIndexPage = lazy(() => import('src/pages/dashboard'));
 const OverviewEcommercePage = lazy(() => import('src/pages/dashboard/ecommerce'));
 const OverviewAnalyticsPage = lazy(() => import('src/pages/dashboard/analytics'));
 const OverviewBankingPage = lazy(() => import('src/pages/dashboard/banking'));

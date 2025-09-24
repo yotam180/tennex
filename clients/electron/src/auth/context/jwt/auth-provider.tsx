@@ -31,11 +31,15 @@ export function AuthProvider({ children }: Props) {
       if (accessToken && isValidToken(accessToken)) {
         setSession(accessToken);
 
-        const res = await axios.get(endpoints.auth.me);
+        // I commented out checking with the server because the app should work
+        // offline as well.
+        // const res = await axios.get(endpoints.auth.me);
 
-        const { user } = res.data;
+        // const { user } = res.data;
 
-        setState({ user: { ...user, accessToken }, loading: false });
+        // TODO: Extract information from the token and store it in the context.
+
+        setState({ user: { accessToken }, loading: false });
       } else {
         setState({ user: null, loading: false });
       }

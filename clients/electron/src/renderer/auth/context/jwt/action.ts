@@ -6,33 +6,34 @@ import { JWT_STORAGE_KEY } from './constant';
 // ----------------------------------------------------------------------
 
 export type SignInParams = {
-  email: string;
+  username: string; // Go backend uses 'username' field
   password: string;
 };
 
 export type SignUpParams = {
+  username: string;
   email: string;
   password: string;
-  firstName: string;
-  lastName: string;
+  first_name: string;
+  last_name: string;
 };
 
 /** **************************************
  * Sign in
  *************************************** */
-export const signInWithPassword = async ({ email, password }: SignInParams): Promise<void> => {
+export const signInWithPassword = async ({ username, password }: SignInParams): Promise<void> => {
   try {
-    const params = { email, password };
+    const params = { username, password };
 
     const res = await axios.post(endpoints.auth.signIn, params);
 
-    const { accessToken } = res.data;
+    const { token } = res.data; // Go backend returns 'token' field
 
-    if (!accessToken) {
+    if (!token) {
       throw new Error('Access token not found in response');
     }
 
-    setSession(accessToken);
+    setSession(token);
   } catch (error) {
     console.error('Error during sign in:', error);
     throw error;
@@ -43,28 +44,30 @@ export const signInWithPassword = async ({ email, password }: SignInParams): Pro
  * Sign up
  *************************************** */
 export const signUp = async ({
+  username,
   email,
   password,
-  firstName,
-  lastName,
+  first_name,
+  last_name,
 }: SignUpParams): Promise<void> => {
   const params = {
+    username,
     email,
     password,
-    firstName,
-    lastName,
+    first_name,
+    last_name,
   };
 
   try {
     const res = await axios.post(endpoints.auth.signUp, params);
 
-    const { accessToken } = res.data;
+    const { token } = res.data; // Go backend returns 'token' field
 
-    if (!accessToken) {
+    if (!token) {
       throw new Error('Access token not found in response');
     }
 
-    sessionStorage.setItem(JWT_STORAGE_KEY, accessToken);
+    setSession(token);
   } catch (error) {
     console.error('Error during sign up:', error);
     throw error;

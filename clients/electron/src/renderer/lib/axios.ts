@@ -33,10 +33,17 @@ export const fetcher = async (args: string | [string, AxiosRequestConfig]) => {
 // ----------------------------------------------------------------------
 
 export const endpoints = {
+  // Tennex Backend API endpoints
+  auth: { 
+    me: '/auth/me', 
+    signIn: '/auth/login', 
+    signUp: '/auth/register' 
+  },
+  qr: '/qr',
+  // Template endpoints (kept for compatibility)
   chat: '/api/chat',
   kanban: '/api/kanban',
   calendar: '/api/calendar',
-  auth: { me: '/api/auth/me', signIn: '/api/auth/sign-in', signUp: '/api/auth/sign-up' },
   mail: { list: '/api/mail/list', details: '/api/mail/details', labels: '/api/mail/labels' },
   post: {
     list: '/api/post/list',

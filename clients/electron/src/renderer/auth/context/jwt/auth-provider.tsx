@@ -5,7 +5,7 @@ import axios, { endpoints } from 'src/lib/axios';
 
 import { JWT_STORAGE_KEY } from './constant';
 import { AuthContext } from '../auth-context';
-import { setSession, isValidToken } from './utils';
+import { setSession, isValidToken, jwtDecode } from './utils';
 
 import type { AuthState } from '../../types';
 
@@ -26,16 +26,29 @@ export function AuthProvider({ children }: Props) {
 
   const checkUserSession = useCallback(async () => {
     try {
-      const accessToken = sessionStorage.getItem(JWT_STORAGE_KEY);
+      const accessToken = localStorage.getItem(JWT_STORAGE_KEY);
 
       if (accessToken && isValidToken(accessToken)) {
         setSession(accessToken);
 
-        const res = await axios.get(endpoints.auth.me);
-
-        const { user } = res.data;
-
-        setState({ user: { ...user, accessToken }, loading: false });
+        try {
+          const res = await axios.get(endpoints.auth.me);
+          const { user } = res.data;
+          setState({ user: { ...user, accessToken }, loading: false });
+        } catch (error) {
+          // If /auth/me fails, still consider user logged in with token info
+          console.warn('Could not fetch user details, using token info:', error);
+          const decodedToken = jwtDecode(accessToken);
+          setState({ 
+            user: { 
+              id: decodedToken.sub || decodedToken.user_id,
+              email: decodedToken.email || 'user@example.com',
+              displayName: decodedToken.name || decodedToken.email || 'User',
+              accessToken 
+            }, 
+            loading: false 
+          });
+        }
       } else {
         setState({ user: null, loading: false });
       }
