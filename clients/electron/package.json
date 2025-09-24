@@ -2,11 +2,10 @@
   "name": "tennex-electron",
   "version": "1.0.0",
   "description": "Local-first WhatsApp messaging client",
-  "main": "dist/main/index.js",
-  "type": "module",
+  "main": "dist/main/main/index.js",
   "scripts": {
     "dev": "concurrently \"npm run dev:main\" \"npm run dev:renderer\"",
-    "dev:main": "tsc -p tsconfig.main.json && electron dist/main/index.js",
+    "dev:main": "tsc -p tsconfig.main.json && electron dist/main/main/index.js",
     "dev:renderer": "vite",
     "build": "npm run build:main && npm run build:renderer",
     "build:main": "tsc -p tsconfig.main.json",
@@ -20,7 +19,9 @@
     "lint": "eslint src --ext .ts,.tsx",
     "test": "vitest",
     "package": "npm run build && electron-builder",
-    "package:prod": "cross-env NODE_ENV=production TENNEX_BACKEND_URL=https://api.tennex.com npm run build && electron-builder"
+    "package:prod": "cross-env NODE_ENV=production TENNEX_BACKEND_URL=https://api.tennex.com npm run build && electron-builder",
+    "rebuild": "npx electron-rebuild",
+    "postinstall": "npx electron-rebuild"
   },
   "dependencies": {
     "@radix-ui/react-avatar": "^1.0.4",
@@ -62,6 +63,7 @@
     "drizzle-kit": "^0.20.6",
     "electron": "^27.1.3",
     "electron-builder": "^24.9.1",
+    "electron-rebuild": "^3.2.9",
     "eslint": "^8.55.0",
     "eslint-plugin-react": "^7.33.2",
     "eslint-plugin-react-hooks": "^4.6.0",

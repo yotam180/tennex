@@ -17,4 +17,8 @@ export default defineConfig({
   server: {
     port: 5173,
   },
+  // Ensure renderer process can use ES modules
+  define: {
+    global: 'globalThis',
+  },
 });
