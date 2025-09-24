@@ -3,8 +3,8 @@
 
 ### Prerequisites: Start the services
 # 1. Start infrastructure: make docker-up (or start Docker manually)
-# 2. Start backend: ./tools/dev-backend.sh (or cd services/backend && go run cmd/backend/main.go)
-# 3. Start bridge: cd services/bridge && ./bridge
+# 2. Start backend: ./tools/dev-backend.sh (or make run-backend)
+# 3. Start bridge: ./tools/dev-bridge.sh (or make run-bridge)
 
 ### Step 1: Register a new user on backend
 # @name registerUser

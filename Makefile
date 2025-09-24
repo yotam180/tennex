@@ -99,8 +99,13 @@ clean: ## Clean generated files and build artifacts
 	@rm -rf pkg/api/gen/
 	@rm -rf pkg/proto/gen/
 	@rm -rf pkg/db/gen/
+	@rm -rf services/bridge/api/gen/
+	@rm -rf bin/
 	@find . -name "*.log" -delete
-	@docker system prune -f
+	@find . -name "bridge" -type f -delete 2>/dev/null || true
+	@find . -name "backend" -type f -delete 2>/dev/null || true
+	@find . -name "eventstream" -type f -delete 2>/dev/null || true
+	@echo "✅ Cleanup complete"
 
 # Docker operations
 docker-up: ## Start docker services (Postgres, NATS, MinIO)
@@ -114,16 +119,35 @@ docker-down: ## Stop docker services
 	@cd deployments/local && docker-compose down
 
 # Build operations
-build-backend: ## Build backend service
+build-backend: gen ## Build backend service
 	@echo "🔨 Building backend..."
+	@mkdir -p bin
 	@cd services/backend && go build -o ../../bin/backend ./cmd/backend
+	@echo "✅ Backend built: bin/backend"
 
-build-bridge: ## Build bridge service  
+build-bridge: gen ## Build bridge service  
 	@echo "🔨 Building bridge..."
+	@mkdir -p bin
 	@cd services/bridge && go build -o ../../bin/bridge .
+	@echo "✅ Bridge built: bin/bridge"
 
-build-eventstream: ## Build event stream service
+build-eventstream: gen ## Build event stream service
 	@echo "🔨 Building event stream..."
+	@mkdir -p bin
 	@cd services/eventstream && go build -o ../../bin/eventstream ./cmd/eventstream
+	@echo "✅ Event stream built: bin/eventstream"
 
 build-all: build-backend build-bridge build-eventstream ## Build all services
+
+# Run operations  
+run-backend: build-backend ## Build and run backend service
+	@echo "🚀 Starting backend service..."
+	@./bin/backend
+
+run-bridge: build-bridge ## Build and run bridge service
+	@echo "🚀 Starting bridge service..."
+	@./bin/bridge
+
+run-eventstream: build-eventstream ## Build and run eventstream service
+	@echo "🚀 Starting eventstream service..."
+	@./bin/eventstream
