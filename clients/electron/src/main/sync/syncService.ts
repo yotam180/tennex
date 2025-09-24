@@ -1,6 +1,10 @@
 import { getDatabase, schema } from '../database/index.js';
-import { eq, gt, and } from 'drizzle-orm';
-import type { Event as BackendEvent, SyncResponse } from '../../generated/api-types.js';
+import { eq, and, sql } from 'drizzle-orm';
+import type { components } from '../../generated/api-types.js';
+// Configuration is imported via the SyncServiceConfig interface
+
+type BackendEvent = components['schemas']['Event'];
+type SyncResponse = components['schemas']['SyncResponse'];
 
 interface SyncServiceConfig {
   backendUrl: string;
@@ -115,7 +119,7 @@ export class SyncService {
       throw new Error(`Sync API error: ${response.status} ${response.statusText}`);
     }
 
-    return await response.json();
+    return await response.json() as SyncResponse;
   }
 
   private async applyEvents(events: BackendEvent[]) {
@@ -172,7 +176,7 @@ export class SyncService {
             lastMessageAt: event.timestamp,
             unreadCount: event.type === 'msg_in' 
               ? sql`${schema.conversations.unreadCount} + 1` 
-              : schema.conversations.unreadCount,
+              : sql`${schema.conversations.unreadCount}`,
             updatedAt: event.timestamp,
           }
         });
@@ -247,7 +251,7 @@ export class SyncService {
       throw new Error(`Outbox API error: ${response.status} ${response.statusText}`);
     }
 
-    const result = await response.json();
+    const result = await response.json() as any;
     
     // Update outbox entry
     await db.update(schema.outbox)
@@ -273,5 +277,3 @@ export class SyncService {
   }
 }
 
-// SQL import needed for the updateConversationProjection method
-import { sql } from 'drizzle-orm';

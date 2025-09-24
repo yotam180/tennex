@@ -1,4 +1,3 @@
-import React from 'react';
 import { useConversations } from '../hooks/useApi.js';
 import { formatDistanceToNow } from 'date-fns';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/Avatar.js';

@@ -1,17 +1,18 @@
 import { ipcMain } from 'electron';
-import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
+import { drizzle } from 'drizzle-orm/better-sqlite3';
 import { eq, desc, and, gte } from 'drizzle-orm';
 import { v4 as uuidv4 } from 'uuid';
 import { schema } from '../database/index.js';
 import { SyncService } from '../sync/syncService.js';
 import { setSyncService } from '../index.js';
+import { getBackendUrl, getSyncInterval } from '../../shared/config.js';
 
-export function registerIpcHandlers(db: BetterSQLite3Database<typeof schema>) {
+export function registerIpcHandlers(db: ReturnType<typeof drizzle<typeof schema>>) {
   
   // Authentication
   ipcMain.handle('auth:login', async (_, credentials: { username: string; password: string }) => {
     try {
-      const response = await fetch('http://localhost:8082/auth/login', {
+      const response = await fetch(`${getBackendUrl()}/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(credentials),
@@ -21,13 +22,13 @@ export function registerIpcHandlers(db: BetterSQLite3Database<typeof schema>) {
         throw new Error('Login failed');
       }
 
-      const authData = await response.json();
+      const authData = await response.json() as any;
       
       // Initialize sync service with auth token
       const syncService = new SyncService({
-        backendUrl: 'http://localhost:8082',
+        backendUrl: getBackendUrl(),
         authToken: authData.token,
-        syncIntervalMs: 5000,
+        syncIntervalMs: getSyncInterval(),
       });
       
       setSyncService(syncService);
@@ -68,28 +69,21 @@ export function registerIpcHandlers(db: BetterSQLite3Database<typeof schema>) {
 
   // Messages/Events
   ipcMain.handle('messages:list', async (_, convoId: string, limit = 50, beforeSeq?: number) => {
-    let query = db.select()
+    const whereConditions = [
+      eq(schema.events.convoId, convoId),
+      eq(schema.events.applied, true)
+    ];
+
+    if (beforeSeq) {
+      whereConditions.push(gte(schema.events.seq, beforeSeq));
+    }
+
+    const events = await db.select()
       .from(schema.events)
-      .where(
-        and(
-          eq(schema.events.convoId, convoId),
-          eq(schema.events.applied, true)
-        )
-      )
+      .where(and(...whereConditions))
       .orderBy(desc(schema.events.seq))
       .limit(limit);
 
-    if (beforeSeq) {
-      query = query.where(
-        and(
-          eq(schema.events.convoId, convoId),
-          eq(schema.events.applied, true),
-          gte(schema.events.seq, beforeSeq)
-        )
-      );
-    }
-
-    const events = await query;
     return events.reverse(); // Return in chronological order
   });
 
@@ -207,7 +201,7 @@ export function registerIpcHandlers(db: BetterSQLite3Database<typeof schema>) {
   // QR Code for pairing
   ipcMain.handle('auth:getQR', async (_, accountId: string) => {
     try {
-      const response = await fetch(`http://localhost:8082/qr?account_id=${accountId}`);
+      const response = await fetch(`${getBackendUrl()}/qr?account_id=${accountId}`);
       
       if (!response.ok) {
         throw new Error('Failed to get QR code');

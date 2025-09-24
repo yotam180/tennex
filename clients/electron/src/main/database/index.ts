@@ -5,7 +5,7 @@ import { app } from 'electron';
 import path from 'path';
 import * as schema from './schema.js';
 
-let db: ReturnType<typeof drizzle>;
+let db: ReturnType<typeof drizzle<typeof schema>>;
 
 export function initializeDatabase() {
   const dbPath = path.join(app.getPath('userData'), 'tennex.db');

@@ -1,14 +1,14 @@
-import React from 'react';
 import { cn } from '../../utils/cn.js';
+import { HTMLAttributes, ImgHTMLAttributes, ReactNode } from 'react';
 
-interface AvatarProps extends React.HTMLAttributes<HTMLDivElement> {
-  children: React.ReactNode;
+interface AvatarProps extends HTMLAttributes<HTMLDivElement> {
+  children: ReactNode;
 }
 
-interface AvatarImageProps extends React.ImgHTMLAttributes<HTMLImageElement> {}
+interface AvatarImageProps extends ImgHTMLAttributes<HTMLImageElement> {}
 
-interface AvatarFallbackProps extends React.HTMLAttributes<HTMLDivElement> {
-  children: React.ReactNode;
+interface AvatarFallbackProps extends HTMLAttributes<HTMLDivElement> {
+  children: ReactNode;
 }
 
 export function Avatar({ className, children, ...props }: AvatarProps) {

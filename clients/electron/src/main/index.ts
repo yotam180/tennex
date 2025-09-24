@@ -1,8 +1,9 @@
-import { app, BrowserWindow, ipcMain, shell } from 'electron';
+import { app, BrowserWindow, shell } from 'electron';
 import path from 'path';
 import { initializeDatabase } from './database/index.js';
 import { SyncService } from './sync/syncService.js';
 import { registerIpcHandlers } from './ipc/handlers.js';
+import { logConfig } from '../shared/config.js';
 
 let mainWindow: BrowserWindow | null = null;
 let syncService: SyncService | null = null;
@@ -51,16 +52,12 @@ function createWindow() {
 
 async function initializeApp() {
   try {
+    // Log configuration
+    logConfig();
+
     // Initialize database
     const db = initializeDatabase();
     console.log('Database initialized');
-
-    // Initialize sync service (will be configured later via IPC)
-    // syncService = new SyncService({
-    //   backendUrl: 'http://localhost:8082',
-    //   authToken: '', // Will be set after authentication
-    //   syncIntervalMs: 5000,
-    // });
 
     // Register IPC handlers
     registerIpcHandlers(db);

@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from 'react';
+import { useRef, useEffect } from 'react';
 import { useMessages } from '../hooks/useApi.js';
 import { format } from 'date-fns';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/Avatar.js';
