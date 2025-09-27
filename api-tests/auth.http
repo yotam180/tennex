@@ -3,7 +3,7 @@
 # Click "Send Request" above each request to execute
 
 ### Variables
-@baseUrl = http://localhost:6000
+@baseUrl = http://localhost:8000
 @contentType = application/json
 
 ### Health Check

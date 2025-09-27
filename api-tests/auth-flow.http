@@ -2,7 +2,7 @@
 # This demonstrates variable capture and reuse in REST Client
 
 ### Variables
-@baseUrl = http://localhost:6000
+@baseUrl = http://localhost:8000
 @contentType = application/json
 
 ### 1. Health Check
@@ -83,7 +83,7 @@ GET {{baseUrl}}/health
 ###
 
 # Revert to localhost
-@baseUrl = http://localhost:6000
+@baseUrl = http://localhost:8000
 
 ### 7. Performance test - Multiple rapid requests
 POST {{baseUrl}}/auth/register

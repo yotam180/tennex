@@ -117,7 +117,7 @@ func loadConfig() (*Config, error) {
 	config.HTTP.Port = 6002
 	config.HTTP.Host = "0.0.0.0"
 	config.NATS.URL = "nats://localhost:4222"
-	config.Backend.URL = "http://localhost:6000"
+	config.Backend.URL = "http://localhost:8000"
 	config.Log.Level = "info"
 	config.Log.JSON = false
 

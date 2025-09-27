@@ -23,12 +23,19 @@ import { useAuthContext } from '../../hooks';
 import { getErrorMessage } from '../../utils';
 import { FormHead } from '../../components/form-head';
 import { SignUpTerms } from '../../components/sign-up-terms';
+import { APP_CONSTANTS } from '../../../constants/app';
 
 // ----------------------------------------------------------------------
 
 export type SignUpSchemaType = zod.infer<typeof SignUpSchema>;
 
 export const SignUpSchema = zod.object({
+  username: zod
+    .string()
+    .min(1, { message: 'Username is required!' })
+    .min(3, { message: 'Username must be at least 3 characters!' })
+    .max(30, { message: 'Username must be at most 30 characters!' })
+    .regex(/^[a-zA-Z0-9_]+$/, { message: 'Username can only contain letters, numbers, and underscores!' }),
   firstName: zod.string().min(1, { message: 'First name is required!' }),
   lastName: zod.string().min(1, { message: 'Last name is required!' }),
   email: zod
@@ -38,7 +45,7 @@ export const SignUpSchema = zod.object({
   password: zod
     .string()
     .min(1, { message: 'Password is required!' })
-    .min(6, { message: 'Password must be at least 6 characters!' }),
+    .min(8, { message: 'Password must be at least 8 characters!' }),
 });
 
 // ----------------------------------------------------------------------
@@ -53,10 +60,11 @@ export function JwtSignUpView() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const defaultValues: SignUpSchemaType = {
-    firstName: 'Hello',
-    lastName: 'Friend',
-    email: 'hello@gmail.com',
-    password: '@2Minimal',
+    username: '',
+    firstName: '',
+    lastName: '',
+    email: '',
+    password: '',
   };
 
   const methods = useForm<SignUpSchemaType>({
@@ -72,10 +80,11 @@ export function JwtSignUpView() {
   const onSubmit = handleSubmit(async (data) => {
     try {
       await signUp({
+        username: data.username,
         email: data.email,
         password: data.password,
-        firstName: data.firstName,
-        lastName: data.lastName,
+        first_name: data.firstName,
+        last_name: data.lastName,
       });
       await checkUserSession?.();
 
@@ -89,6 +98,13 @@ export function JwtSignUpView() {
 
   const renderForm = () => (
     <Box sx={{ gap: 3, display: 'flex', flexDirection: 'column' }}>
+      <Field.Text 
+        name="username" 
+        label="Username" 
+        placeholder="3-30 characters, letters, numbers, and underscores only"
+        slotProps={{ inputLabel: { shrink: true } }} 
+      />
+
       <Box
         sx={{ display: 'flex', gap: { xs: 3, sm: 2 }, flexDirection: { xs: 'column', sm: 'row' } }}
       >
@@ -109,7 +125,7 @@ export function JwtSignUpView() {
       <Field.Text
         name="password"
         label="Password"
-        placeholder="6+ characters"
+        placeholder="8+ characters"
         type={showPassword.value ? 'text' : 'password'}
         slotProps={{
           inputLabel: { shrink: true },
@@ -142,12 +158,12 @@ export function JwtSignUpView() {
   return (
     <>
       <FormHead
-        title="Get started absolutely free"
+        title={`Join ${APP_CONSTANTS.PRODUCT_NAME}`}
         description={
           <>
             {`Already have an account? `}
             <Link component={RouterLink} href={paths.auth.jwt.signIn} variant="subtitle2">
-              Get started
+              Sign in
             </Link>
           </>
         }

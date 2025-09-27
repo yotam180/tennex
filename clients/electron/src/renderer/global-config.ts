@@ -34,7 +34,7 @@ export type ConfigValue = {
 export const CONFIG: ConfigValue = {
   appName: 'Minimal UI',
   appVersion: packageJson.version,
-  serverUrl: import.meta.env.VITE_SERVER_URL ?? 'http://localhost:6000',
+  serverUrl: import.meta.env.VITE_SERVER_URL ?? 'http://localhost:8000',
   assetsDir: import.meta.env.VITE_ASSETS_DIR ?? '',
   /**
    * Auth

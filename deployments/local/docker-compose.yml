@@ -74,13 +74,13 @@ services:
     container_name: tennex-backend
     restart: unless-stopped
     environment:
-      TENNEX_HTTP_PORT: 6000
+      TENNEX_HTTP_PORT: 8000
       TENNEX_GRPC_PORT: 6001
       TENNEX_DATABASE_URL: postgres://tennex:tennex123@postgres:5432/tennex?sslmode=disable
       TENNEX_NATS_URL: nats://nats:4222
       TENNEX_LOG_LEVEL: debug
     ports:
-      - "6000:6000"  # HTTP API
+      - "8000:8000"  # HTTP API
       - "6001:6001"  # gRPC
     depends_on:
       postgres:
@@ -101,7 +101,7 @@ services:
     environment:
       TENNEX_HTTP_PORT: 6002
       TENNEX_NATS_URL: nats://nats:4222
-      TENNEX_BACKEND_URL: http://backend:6000
+      TENNEX_BACKEND_URL: http://backend:8000
       TENNEX_LOG_LEVEL: debug
     ports:
       - "6002:6002"  # WebSocket API
@@ -122,7 +122,7 @@ services:
     environment:
       TENNEX_HTTP_PORT: 6003
       TENNEX_DATABASE_URL: postgres://tennex:tennex123@postgres:5432/tennex?sslmode=disable
-      TENNEX_BACKEND_URL: http://backend:6000
+      TENNEX_BACKEND_URL: http://backend:8000
       TENNEX_LOG_LEVEL: debug
     ports:
       - "6003:6003"  # Bridge API

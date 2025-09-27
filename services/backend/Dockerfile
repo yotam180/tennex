@@ -35,6 +35,6 @@ RUN addgroup -g 1001 -S tennex && \
 
 USER tennex
 
-EXPOSE 6000 6001
+EXPOSE 8000 6001
 
 CMD ["./backend"]

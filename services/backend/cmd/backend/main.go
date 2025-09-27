@@ -185,7 +185,7 @@ func loadConfig() (*Config, error) {
 
 	// Load defaults
 	config := &Config{}
-	config.HTTP.Port = 6000
+	config.HTTP.Port = 8000
 	config.HTTP.Host = "0.0.0.0"
 	config.GRPC.Port = 6001
 	config.GRPC.Host = "0.0.0.0"

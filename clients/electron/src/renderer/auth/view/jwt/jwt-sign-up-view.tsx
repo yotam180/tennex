@@ -23,6 +23,7 @@ import { useAuthContext } from '../../hooks';
 import { getErrorMessage } from '../../utils';
 import { FormHead } from '../../components/form-head';
 import { SignUpTerms } from '../../components/sign-up-terms';
+import { APP_CONSTANTS } from 'src/constants/app';
 
 // ----------------------------------------------------------------------
 
@@ -59,11 +60,11 @@ export function JwtSignUpView() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const defaultValues: SignUpSchemaType = {
-    username: 'demo_user',
-    firstName: 'Hello',
-    lastName: 'Friend',
-    email: 'hello@gmail.com',
-    password: 'password123',
+    username: '',
+    firstName: '',
+    lastName: '',
+    email: '',
+    password: '',
   };
 
   const methods = useForm<SignUpSchemaType>({
@@ -157,12 +158,12 @@ export function JwtSignUpView() {
   return (
     <>
       <FormHead
-        title="Get started absolutely free"
+        title={`Join ${APP_CONSTANTS.PRODUCT_NAME}`}
         description={
           <>
             {`Already have an account? `}
             <Link component={RouterLink} href={paths.auth.jwt.signIn} variant="subtitle2">
-              Get started
+              Sign in
             </Link>
           </>
         }

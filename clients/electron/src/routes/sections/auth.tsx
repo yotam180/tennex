@@ -44,7 +44,14 @@ const authJwt = {
       path: 'sign-up',
       element: (
         <GuestGuard>
-          <AuthSplitLayout>
+          <AuthSplitLayout
+            slotProps={{
+              section: { 
+                title: APP_CONSTANTS.WELCOME_MESSAGE, 
+                subtitle: APP_CONSTANTS.TAGLINE 
+              },
+            }}
+          >
             <Jwt.SignUpPage />
           </AuthSplitLayout>
         </GuestGuard>

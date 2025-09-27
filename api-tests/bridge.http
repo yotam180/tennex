@@ -54,7 +54,7 @@ Authorization: Bearer invalid-token-here
 ### Complete Flow Example:
 ### Step A: First login to backend to get a valid JWT token
 # @name backendLogin
-POST http://localhost:6000/auth/login
+POST http://localhost:8000/auth/login
 Content-Type: {{contentType}}
 
 {
