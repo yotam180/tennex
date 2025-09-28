@@ -1,43 +1,30 @@
-# Build stage
-FROM golang:1.24-alpine AS builder
+# Development Dockerfile with air hot reloading
+FROM golang:1.25-alpine
+
+# Install air for hot reloading
+RUN go install github.com/air-verse/air@latest
 
 WORKDIR /app
 
-# Copy workspace and module files
+# Copy all workspace files for go.work
 COPY go.work* ./
 COPY services/backend/go.mod services/backend/go.sum ./services/backend/
 COPY services/eventstream/go.mod services/eventstream/go.sum ./services/eventstream/
 COPY services/bridge/go.mod services/bridge/go.sum ./services/bridge/
 COPY shared/go.mod shared/go.sum ./shared/
-
-# Copy pkg directory and shared dependencies
 COPY pkg/ ./pkg/
-COPY shared/ ./shared/
 
-# Copy bridge source code
-COPY services/bridge/ ./services/bridge/
+# Copy shared dependencies
+COPY shared/ ./shared/
 
 # Download dependencies
 RUN cd services/bridge && go mod download
 
-# Build binary
-RUN cd services/bridge && CGO_ENABLED=0 GOOS=linux go build -o /app/bridge .
+# Set working directory to bridge service
+WORKDIR /app/services/bridge
 
-# Runtime stage
-FROM alpine:latest
-
-RUN apk --no-cache add ca-certificates tzdata
-
-WORKDIR /root/
-
-COPY --from=builder /app/bridge .
-
-# Create non-root user
-RUN addgroup -g 1001 -S tennex && \
-    adduser -u 1001 -S tennex -G tennex
-
-USER tennex
-
+# Expose port
 EXPOSE 6003
 
-CMD ["./bridge"]
+# Run air for hot reloading
+CMD ["air", "-c", ".air.toml"]

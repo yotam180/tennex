@@ -100,10 +100,14 @@ func (h *WhatsAppHandler) ConnectWhatsApp(w http.ResponseWriter, r *http.Request
 	fmt.Printf("📱 Starting WhatsApp connection flow for user %s (session: %s)\n", userID, sessionID)
 
 	// Start WhatsApp connection flow in background
+	// Use background context so connection survives HTTP request completion
+	connCtx := context.Background()
 	go func() {
-		if err := h.whatsappConnector.RunWhatsAppConnectionFlow(r.Context(), userIDStr, qrChan); err != nil {
+		fmt.Printf("🚀 [WA DEBUG] Starting WhatsApp connection with background context\n")
+		if err := h.whatsappConnector.RunWhatsAppConnectionFlow(connCtx, userIDStr, qrChan); err != nil {
 			fmt.Printf("❌ WhatsApp connection failed for user %s: %v\n", userID, err)
 		}
+		fmt.Printf("🔚 [WA DEBUG] WhatsApp connection flow completed for user %s\n", userID)
 	}()
 
 	// Wait for QR code (with timeout)

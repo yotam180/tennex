@@ -126,8 +126,15 @@ services:
       TENNEX_BACKEND_URL: http://backend:8000
       JWT_SECRET: dev-jwt-secret-change-in-production
       TENNEX_LOG_LEVEL: debug
+      CGO_ENABLED: 0
     ports:
       - "6003:6003"  # Bridge API
+    volumes:
+      # Mount source code for hot reloading
+      - ../../services/bridge:/app/services/bridge
+      - ../../shared:/app/shared
+      # Cache go modules to avoid re-downloading
+      - bridge_go_cache:/go/pkg/mod
     depends_on:
       - backend
     networks:
@@ -160,6 +167,8 @@ volumes:
   pgadmin_data:
     driver: local
   minio_data:
+    driver: local
+  bridge_go_cache:
     driver: local
 
 networks:

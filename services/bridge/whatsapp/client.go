@@ -59,7 +59,15 @@ func (c *WhatsAppConnector) RunWhatsAppConnectionFlow(ctx context.Context, accou
 	}
 
 	go func() {
+		fmt.Printf("🔄 [WA CLIENT DEBUG] Starting QR handler goroutine\n")
+		defer fmt.Printf("🔄 [WA CLIENT DEBUG] QR handler goroutine exiting\n")
+
+		qrHandled := false
+
+		// Handle QR events
 		for evt := range qrChan {
+			fmt.Printf("🔄 [WA CLIENT DEBUG] Received QR event: %s\n", evt.Event)
+
 			switch evt.Event {
 			case "code":
 				fmt.Println("\nScan this QR with WhatsApp:")
@@ -84,10 +92,20 @@ func (c *WhatsAppConnector) RunWhatsAppConnectionFlow(ctx context.Context, accou
 				}
 
 				fmt.Printf("✅ Connection saved successfully!\n")
+				qrHandled = true
 			}
 		}
 
-		<-ctx.Done()
+		fmt.Printf("🔄 [WA CLIENT DEBUG] QR channel closed, qrHandled=%v\n", qrHandled)
+
+		// Keep connection alive if QR was successfully handled
+		if qrHandled {
+			fmt.Printf("🔄 [WA CLIENT DEBUG] Keeping WhatsApp connection alive...\n")
+			// Keep the client connected and handle events
+			<-ctx.Done()
+			fmt.Printf("🔄 [WA CLIENT DEBUG] Context cancelled, disconnecting WhatsApp client\n")
+			client.Disconnect()
+		}
 	}()
 
 	return nil
