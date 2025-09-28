@@ -1,18 +1,20 @@
 package db
 
 import (
-	"fmt"
+	"os"
 )
 
-// TODO: Take from environment variables
+// Database connection defaults
 const (
-	DatabaseName     = "tennex"
-	DatabaseHost     = "localhost"
-	DatabasePort     = "5432"
-	DatabaseUser     = "tennex"
-	DatabasePassword = "tennex123"
+	DefaultDatabaseURL = "postgres://tennex:tennex123@localhost:5432/tennex?sslmode=disable"
 )
 
 func GetConnectionString() string {
-	return fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=disable", DatabaseUser, DatabasePassword, DatabaseHost, DatabasePort, DatabaseName)
+	// Check for TENNEX_DATABASE_URL environment variable first
+	if dbURL := os.Getenv("TENNEX_DATABASE_URL"); dbURL != "" {
+		return dbURL
+	}
+
+	// Fallback to default connection string
+	return DefaultDatabaseURL
 }

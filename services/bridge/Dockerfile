@@ -3,17 +3,25 @@ FROM golang:1.24-alpine AS builder
 
 WORKDIR /app
 
-# Copy go mod files (bridge only, no workspace)
-COPY services/bridge/go.mod services/bridge/go.su[m] ./
+# Copy workspace and module files
+COPY go.work* ./
+COPY services/backend/go.mod services/backend/go.sum ./services/backend/
+COPY services/eventstream/go.mod services/eventstream/go.sum ./services/eventstream/
+COPY services/bridge/go.mod services/bridge/go.sum ./services/bridge/
+COPY shared/go.mod shared/go.sum ./shared/
+
+# Copy pkg directory and shared dependencies
+COPY pkg/ ./pkg/
+COPY shared/ ./shared/
+
+# Copy bridge source code
+COPY services/bridge/ ./services/bridge/
 
 # Download dependencies
-RUN go mod download
-
-# Copy source code
-COPY services/bridge/ ./
+RUN cd services/bridge && go mod download
 
 # Build binary
-RUN CGO_ENABLED=0 GOOS=linux go build -o /app/bridge .
+RUN cd services/bridge && CGO_ENABLED=0 GOOS=linux go build -o /app/bridge .
 
 # Runtime stage
 FROM alpine:latest

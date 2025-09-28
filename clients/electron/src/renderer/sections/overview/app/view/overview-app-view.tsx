@@ -2,7 +2,7 @@ import Box from '@mui/material/Box';
 import Grid from '@mui/material/Grid2';
 import Button from '@mui/material/Button';
 import Typography from '@mui/material/Typography';
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import { useTheme } from '@mui/material/styles';
 
 import { DashboardContent } from 'src/layouts/dashboard';
