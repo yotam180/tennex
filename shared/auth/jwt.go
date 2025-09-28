@@ -12,6 +12,13 @@ import (
 	"github.com/google/uuid"
 )
 
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
+}
+
 // Claims represents the JWT token claims
 type Claims struct {
 	UserID uuid.UUID `json:"user_id"`
@@ -39,8 +46,14 @@ func DefaultJWTConfig(secret string) *JWTConfig {
 
 // GenerateToken generates a new JWT token for the given user ID
 func (c *JWTConfig) GenerateToken(userID uuid.UUID) (string, time.Time, error) {
+	fmt.Printf("🔥 [TOKEN GEN DEBUG] Generating token for user: %s\n", userID.String())
+
 	now := time.Now()
 	expirationTime := now.Add(c.TTL)
+
+	fmt.Printf("🔥 [TOKEN GEN DEBUG] Current time: %v\n", now)
+	fmt.Printf("🔥 [TOKEN GEN DEBUG] Expiration time: %v\n", expirationTime)
+	fmt.Printf("🔥 [TOKEN GEN DEBUG] TTL: %v\n", c.TTL)
 
 	claims := &Claims{
 		UserID: userID,
@@ -50,33 +63,65 @@ func (c *JWTConfig) GenerateToken(userID uuid.UUID) (string, time.Time, error) {
 		},
 	}
 
+	fmt.Printf("🔥 [TOKEN GEN DEBUG] Claims created: %+v\n", claims)
+
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	fmt.Printf("🔥 [TOKEN GEN DEBUG] JWT secret length: %d\n", len(c.Secret))
+	fmt.Printf("🔥 [TOKEN GEN DEBUG] JWT secret (first 10): %s\n", string(c.Secret)[:min(10, len(c.Secret))])
+
 	tokenString, err := token.SignedString(c.Secret)
 	if err != nil {
+		fmt.Printf("🔥 [TOKEN GEN DEBUG] ❌ Failed to sign token: %v\n", err)
 		return "", time.Time{}, fmt.Errorf("failed to sign token: %w", err)
 	}
+
+	fmt.Printf("🔥 [TOKEN GEN DEBUG] ✅ Token generated successfully (length: %d)\n", len(tokenString))
+	fmt.Printf("🔥 [TOKEN GEN DEBUG] Token (first 50): %s\n", tokenString[:min(50, len(tokenString))])
 
 	return tokenString, expirationTime, nil
 }
 
 // ValidateToken validates and parses a JWT token, returning the claims
 func (c *JWTConfig) ValidateToken(tokenString string) (*Claims, error) {
+	fmt.Printf("🔍 [TOKEN DEBUG] Starting token validation\n")
+	fmt.Printf("🔍 [TOKEN DEBUG] Token string length: %d\n", len(tokenString))
+
 	claims := &Claims{}
 
 	token, err := jwt.ParseWithClaims(tokenString, claims, func(token *jwt.Token) (interface{}, error) {
+		fmt.Printf("🔍 [TOKEN DEBUG] Token header: %+v\n", token.Header)
+		fmt.Printf("🔍 [TOKEN DEBUG] Token method: %v\n", token.Method)
+
 		// Validate the signing method
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+			fmt.Printf("🔍 [TOKEN DEBUG] ❌ Unexpected signing method: %v\n", token.Header["alg"])
 			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
 		}
+
+		fmt.Printf("🔍 [TOKEN DEBUG] ✅ Signing method is HMAC\n")
+		fmt.Printf("🔍 [TOKEN DEBUG] Using secret length: %d\n", len(c.Secret))
 		return c.Secret, nil
 	})
 
 	if err != nil {
+		fmt.Printf("🔍 [TOKEN DEBUG] ❌ Token parsing failed: %v\n", err)
 		return nil, fmt.Errorf("failed to parse token: %w", err)
 	}
 
 	if !token.Valid {
+		fmt.Printf("🔍 [TOKEN DEBUG] ❌ Token is not valid\n")
 		return nil, fmt.Errorf("invalid token")
+	}
+
+	fmt.Printf("🔍 [TOKEN DEBUG] ✅ Token is valid\n")
+	fmt.Printf("🔍 [TOKEN DEBUG] Parsed claims: %+v\n", claims)
+	fmt.Printf("🔍 [TOKEN DEBUG] User ID: %s\n", claims.UserID.String())
+
+	if claims.ExpiresAt != nil {
+		fmt.Printf("🔍 [TOKEN DEBUG] Expires at: %v\n", claims.ExpiresAt.Time)
+	}
+	if claims.IssuedAt != nil {
+		fmt.Printf("🔍 [TOKEN DEBUG] Issued at: %v\n", claims.IssuedAt.Time)
 	}
 
 	return claims, nil
@@ -153,4 +198,3 @@ var (
 		Status:  http.StatusUnauthorized,
 	}
 )
-

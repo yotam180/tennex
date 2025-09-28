@@ -78,6 +78,7 @@ services:
       TENNEX_GRPC_PORT: 6001
       TENNEX_DATABASE_URL: postgres://tennex:tennex123@postgres:5432/tennex?sslmode=disable
       TENNEX_NATS_URL: nats://nats:4222
+      TENNEX_AUTH_JWT_SECRET: dev-jwt-secret-change-in-production
       TENNEX_LOG_LEVEL: debug
     ports:
       - "8000:8000"  # HTTP API
@@ -123,6 +124,7 @@ services:
       TENNEX_HTTP_PORT: 6003
       TENNEX_DATABASE_URL: postgres://tennex:tennex123@postgres:5432/tennex?sslmode=disable
       TENNEX_BACKEND_URL: http://backend:8000
+      JWT_SECRET: dev-jwt-secret-change-in-production
       TENNEX_LOG_LEVEL: debug
     ports:
       - "6003:6003"  # Bridge API

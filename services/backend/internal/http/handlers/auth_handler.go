@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
 	"go.uber.org/zap"
@@ -16,6 +15,7 @@ import (
 	"github.com/oapi-codegen/runtime/types"
 	api "github.com/tennex/pkg/api/gen" // Generated API types
 	db "github.com/tennex/pkg/db/gen"   // Generated DB types and functions
+	"github.com/tennex/shared/auth"
 )
 
 // Error constants
@@ -27,7 +27,7 @@ var (
 // AuthHandler handles authentication requests using generated types
 type AuthHandler struct {
 	queries   *db.Queries
-	jwtSecret []byte
+	jwtConfig *auth.JWTConfig
 	logger    *zap.Logger
 }
 
@@ -35,7 +35,7 @@ type AuthHandler struct {
 func NewAuthHandler(queries *db.Queries, jwtSecret string, logger *zap.Logger) *AuthHandler {
 	return &AuthHandler{
 		queries:   queries,
-		jwtSecret: []byte(jwtSecret),
+		jwtConfig: auth.DefaultJWTConfig(jwtSecret),
 		logger:    logger.Named("auth_handler"),
 	}
 }
@@ -247,71 +247,24 @@ func (h *AuthHandler) GetCurrentUser(w http.ResponseWriter, r *http.Request) {
 // Helper methods
 
 func (h *AuthHandler) generateJWT(userID uuid.UUID) (string, time.Time, error) {
-	expiresAt := time.Now().Add(24 * time.Hour) // 24 hour expiry
-
-	claims := jwt.MapClaims{
-		"user_id": userID.String(),
-		"exp":     expiresAt.Unix(),
-		"iat":     time.Now().Unix(),
-	}
-
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	tokenString, err := token.SignedString(h.jwtSecret)
-	if err != nil {
-		return "", time.Time{}, err
-	}
-
-	return tokenString, expiresAt, nil
+	return h.jwtConfig.GenerateToken(userID)
 }
 
 func (h *AuthHandler) extractUserFromToken(r *http.Request) (uuid.UUID, error) {
 	// Extract token from Authorization header
 	authHeader := r.Header.Get("Authorization")
-	if authHeader == "" {
+	tokenString, err := auth.ExtractTokenFromHeader(authHeader)
+	if err != nil {
 		return uuid.Nil, ErrMissingToken
 	}
 
-	// Remove "Bearer " prefix
-	tokenString := ""
-	if len(authHeader) > 7 && authHeader[:7] == "Bearer " {
-		tokenString = authHeader[7:]
-	} else {
-		return uuid.Nil, ErrMissingToken
-	}
-
-	// Parse and validate token
-	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
-		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-			return nil, jwt.ErrSignatureInvalid
-		}
-		return h.jwtSecret, nil
-	})
-
+	// Validate token using shared auth package
+	claims, err := h.jwtConfig.ValidateToken(tokenString)
 	if err != nil {
-		return uuid.Nil, err
-	}
-
-	if !token.Valid {
 		return uuid.Nil, ErrInvalidToken
 	}
 
-	// Extract user ID from claims
-	claims, ok := token.Claims.(jwt.MapClaims)
-	if !ok {
-		return uuid.Nil, ErrInvalidToken
-	}
-
-	userIDStr, ok := claims["user_id"].(string)
-	if !ok {
-		return uuid.Nil, ErrInvalidToken
-	}
-
-	userID, err := uuid.Parse(userIDStr)
-	if err != nil {
-		return uuid.Nil, err
-	}
-
-	return userID, nil
+	return claims.UserID, nil
 }
 
 func (h *AuthHandler) writeJSON(w http.ResponseWriter, status int, data interface{}) {

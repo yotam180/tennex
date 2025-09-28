@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"time"
 
@@ -34,12 +35,18 @@ func (h *WhatsAppHandler) Routes() chi.Router {
 	// All WhatsApp routes require authentication
 	r.Use(func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			log.Printf("🔵 [WA HANDLER DEBUG] Processing WhatsApp route: %s %s\n", r.Method, r.URL.Path)
+
 			// Ensure user is authenticated (JWT middleware should have run first)
 			userID, err := auth.GetUserIDFromContext(r.Context())
 			if err != nil {
+				log.Printf("🔵 [WA HANDLER DEBUG] ❌ Failed to get user ID from context: %v\n", err)
+				log.Printf("🔵 [WA HANDLER DEBUG] ❌ Context keys available: %+v\n", r.Context())
 				h.writeError(w, http.StatusUnauthorized, "authentication_required", "User must be authenticated", nil)
 				return
 			}
+
+			log.Printf("🔵 [WA HANDLER DEBUG] ✅ User authenticated successfully: %s\n", userID.String())
 
 			// Add user ID to context for convenience
 			ctx := context.WithValue(r.Context(), "user_id", userID.String())

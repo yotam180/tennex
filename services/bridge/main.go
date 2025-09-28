@@ -19,9 +19,16 @@ import (
 )
 
 const (
-	DefaultJWTSecret = "your-jwt-secret-key-change-in-production"
+	DefaultJWTSecret = "dev-jwt-secret-change-in-production"
 	DefaultPort      = "6003"
 )
+
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
+}
 
 func main() {
 	// Setup structured logging
@@ -63,6 +70,14 @@ func main() {
 		jwtSecret = DefaultJWTSecret
 		slog.Warn("Using default JWT secret - change for production!")
 	}
+
+	// Debug logging for JWT configuration
+	slog.Info("🔐 JWT Configuration Debug",
+		"secret_length", len(jwtSecret),
+		"secret_first_10", jwtSecret[:min(10, len(jwtSecret))],
+		"env_jwt_secret_set", os.Getenv("JWT_SECRET") != "",
+	)
+
 	jwtConfig := auth.DefaultJWTConfig(jwtSecret)
 	slog.Info("✅ JWT authentication configured")
 
@@ -117,6 +132,7 @@ func main() {
 	slog.Info("  WhatsApp connect: POST http://localhost:" + DefaultPort + "/whatsapp/connect (requires JWT)")
 	slog.Info("  WhatsApp status: GET http://localhost:" + DefaultPort + "/whatsapp/status (requires JWT)")
 	slog.Info("  Connections: GET http://localhost:" + DefaultPort + "/connections (requires JWT)")
+	slog.Info("🔐 JWT Debug Mode ENABLED - tokens will be logged in detail")
 
 	// Wait for shutdown signal
 	<-ctx.Done()
