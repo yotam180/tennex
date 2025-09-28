@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -205,7 +206,11 @@ func loadConfig() (*Config, error) {
 
 	// Load from environment (TENNEX_ prefix)
 	if err := k.Load(env.Provider("TENNEX_", ".", func(s string) string {
-		return s[7:] // Remove TENNEX_ prefix
+		// Convert TENNEX_HTTP_PORT to http.port, TENNEX_DATABASE_URL to database.url, etc.
+		key := s[7:] // Remove TENNEX_ prefix
+		key = strings.ToLower(key)
+		key = strings.ReplaceAll(key, "_", ".")
+		return key
 	}), nil); err != nil {
 		return nil, fmt.Errorf("error loading env config: %w", err)
 	}

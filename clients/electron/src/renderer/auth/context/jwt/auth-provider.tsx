@@ -38,9 +38,9 @@ export function AuthProvider({ children }: Props) {
         try {
           console.log('🔄 Fetching user details from /auth/me...');
           const res = await axios.get(endpoints.auth.me);
-          const { user } = res.data;
+          const user = res.data; // Backend returns user object directly, not wrapped
           console.log('✅ User details fetched successfully:', user);
-          setState({ user: { ...user, accessToken }, loading: false });
+          setState({ user: { ...user, accessToken, role: 'admin' }, loading: false });
         } catch (error) {
           // If /auth/me fails, still consider user logged in with token info
           console.warn('⚠️ Could not fetch user details, using token info:', error);
@@ -48,9 +48,11 @@ export function AuthProvider({ children }: Props) {
           console.log('🔍 Decoded token:', decodedToken);
           setState({ 
             user: { 
-              id: decodedToken.sub || decodedToken.user_id,
+              id: decodedToken.user_id || decodedToken.sub, // Our backend uses user_id
+              username: decodedToken.username || 'user',
               email: decodedToken.email || 'user@example.com',
-              displayName: decodedToken.name || decodedToken.email || 'User',
+              displayName: decodedToken.name || decodedToken.username || 'User',
+              role: 'admin',
               accessToken 
             }, 
             loading: false 

@@ -5,7 +5,7 @@ import axios, { endpoints } from 'src/lib/axios';
 
 import { JWT_STORAGE_KEY } from './constant';
 import { AuthContext } from '../auth-context';
-import { setSession, isValidToken } from './utils';
+import { setSession, isValidToken, jwtDecode } from './utils';
 
 import type { AuthState } from '../../types';
 
@@ -25,26 +25,45 @@ export function AuthProvider({ children }: Props) {
   const { state, setState } = useSetState<AuthState>({ user: null, loading: true });
 
   const checkUserSession = useCallback(async () => {
+    console.log('🔍 JWT Auth Provider - Checking user session...');
+    
     try {
       const accessToken = sessionStorage.getItem(JWT_STORAGE_KEY);
+      console.log('🔍 Found token in sessionStorage:', !!accessToken);
 
       if (accessToken && isValidToken(accessToken)) {
+        console.log('✅ Token is valid, setting session...');
         setSession(accessToken);
 
-        // I commented out checking with the server because the app should work
-        // offline as well.
-        // const res = await axios.get(endpoints.auth.me);
-
-        // const { user } = res.data;
-
-        // TODO: Extract information from the token and store it in the context.
-
-        setState({ user: { accessToken }, loading: false });
+        try {
+          console.log('🔄 Fetching user details from /auth/me...');
+          const res = await axios.get(endpoints.auth.me);
+          const user = res.data; // Backend returns user object directly, not wrapped
+          console.log('✅ User details fetched successfully:', user);
+          setState({ user: { ...user, accessToken, role: 'admin' }, loading: false });
+        } catch (error) {
+          // If /auth/me fails, still consider user logged in with token info
+          console.warn('⚠️ Could not fetch user details, using token info:', error);
+          const decodedToken = jwtDecode(accessToken);
+          console.log('🔍 Decoded token:', decodedToken);
+          setState({ 
+            user: { 
+              id: decodedToken.user_id || decodedToken.sub, // Our backend uses user_id
+              username: decodedToken.username || 'user',
+              email: decodedToken.email || 'user@example.com',
+              displayName: decodedToken.name || decodedToken.username || 'User',
+              role: 'admin',
+              accessToken 
+            }, 
+            loading: false 
+          });
+        }
       } else {
+        console.log('❌ No valid token found, setting user to null');
         setState({ user: null, loading: false });
       }
     } catch (error) {
-      console.error(error);
+      console.error('🚨 Error in checkUserSession:', error);
       setState({ user: null, loading: false });
     }
   }, [setState]);

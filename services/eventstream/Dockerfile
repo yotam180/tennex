@@ -1,5 +1,5 @@
 # Build stage
-FROM golang:1.22-alpine AS builder
+FROM golang:1.24-alpine AS builder
 
 WORKDIR /app
 
@@ -7,9 +7,12 @@ WORKDIR /app
 COPY go.work* ./
 COPY services/backend/go.mod services/backend/go.su[m] ./services/backend/
 COPY services/eventstream/go.mod services/eventstream/go.su[m] ./services/eventstream/
+COPY services/bridge/go.mod services/bridge/go.su[m] ./services/bridge/
+COPY shared/go.mod shared/go.su[m] ./shared/
 
-# Copy pkg directory for shared dependencies
+# Copy pkg directory and shared dependencies
 COPY pkg/ ./pkg/
+COPY shared/ ./shared/
 
 # Download dependencies
 RUN cd services/eventstream && go mod download
