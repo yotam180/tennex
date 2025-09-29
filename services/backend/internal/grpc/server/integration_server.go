@@ -422,7 +422,30 @@ func (s *IntegrationServer) upsertMessage(ctx context.Context, integrationCtx *p
 		ExternalConversationID: conversationExternalID,
 	})
 	if err != nil {
-		return fmt.Errorf("failed to find conversation %s: %w", conversationExternalID, err)
+		// Conversation doesn't exist - auto-create it for real-time messages
+		s.logger.Info("Conversation not found, auto-creating for real-time message",
+			zap.String("conversation_id", conversationExternalID),
+			zap.String("message_id", message.PlatformId))
+
+		// Create minimal conversation
+		err = s.upsertConversation(ctx, integrationCtx, &proto.Conversation{
+			PlatformId:       conversationExternalID,
+			Type:             proto.ConversationType_CONVERSATION_TYPE_INDIVIDUAL, // Default to individual
+			Name:             "",                                                  // Will be updated later
+			PlatformMetadata: make(map[string]string),
+		})
+		if err != nil {
+			return fmt.Errorf("failed to auto-create conversation %s: %w", conversationExternalID, err)
+		}
+
+		// Try to get it again
+		conversation, err = s.db.GetConversationByExternalID(ctx, gen.GetConversationByExternalIDParams{
+			UserIntegrationID:      integrationCtx.UserIntegrationId,
+			ExternalConversationID: conversationExternalID,
+		})
+		if err != nil {
+			return fmt.Errorf("failed to find conversation after auto-create %s: %w", conversationExternalID, err)
+		}
 	}
 
 	// Convert platform metadata
