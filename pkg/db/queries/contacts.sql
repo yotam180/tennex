@@ -326,3 +326,32 @@ SELECT COUNT(*) as total_contacts,
     ) as recently_active
 FROM contacts
 WHERE user_integration_id = $1::int;
+-- name: ListUserIntegrationContactsSinceSeq :many
+-- Fetch contacts for a user integration since a sequence number (for sync)
+SELECT seq,
+    id,
+    user_integration_id,
+    external_contact_id,
+    integration_type,
+    display_name,
+    first_name,
+    last_name,
+    phone_number,
+    username,
+    is_blocked,
+    is_favorite,
+    last_seen,
+    avatar_url,
+    platform_metadata,
+    created_at,
+    updated_at
+FROM contacts
+WHERE user_integration_id = @user_integration_id::int
+    AND seq > @since_seq::bigint
+ORDER BY seq ASC
+LIMIT @limit_count::int;
+-- name: GetUserIntegrationLatestContactSeq :one
+-- Get the latest contact sequence number for a user integration
+SELECT COALESCE(MAX(seq), 0) as latest_seq
+FROM contacts
+WHERE user_integration_id = @user_integration_id::int;

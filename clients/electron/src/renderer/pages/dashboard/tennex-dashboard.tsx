@@ -6,9 +6,9 @@ import Avatar from '@mui/material/Avatar';
 import Typography from '@mui/material/Typography';
 import CardContent from '@mui/material/CardContent';
 
-import { useAuthContext } from 'src/auth/hooks';
-
 import { Iconify } from 'src/components/iconify';
+
+import { useAuthContext } from 'src/auth/hooks';
 
 // ----------------------------------------------------------------------
 
@@ -28,25 +28,23 @@ export default function TennexDashboard() {
             <CardContent>
               <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
                 <Avatar
-                  sx={{ 
-                    width: 56, 
-                    height: 56, 
+                  sx={{
+                    width: 56,
+                    height: 56,
                     mr: 2,
-                    bgcolor: 'primary.main'
+                    bgcolor: 'primary.main',
                   }}
                 >
                   {user?.displayName?.charAt(0) || user?.email?.charAt(0) || 'U'}
                 </Avatar>
                 <Box>
-                  <Typography variant="h6">
-                    {user?.displayName || 'User'}
-                  </Typography>
+                  <Typography variant="h6">{user?.displayName || 'User'}</Typography>
                   <Typography variant="body2" color="text.secondary">
                     {user?.email || 'No email'}
                   </Typography>
                 </Box>
               </Box>
-              
+
               <Typography variant="body2" color="text.secondary">
                 JWT Token Active ✅
               </Typography>
@@ -61,8 +59,17 @@ export default function TennexDashboard() {
               <Typography variant="h6" sx={{ mb: 2 }}>
                 Quick Actions
               </Typography>
-              
+
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                <Button
+                  variant="outlined"
+                  href="/dashboard/whatsapp/sync"
+                  startIcon={<Iconify icon="solar:refresh-circle-outline" />}
+                  sx={{ justifyContent: 'flex-start' }}
+                >
+                  Sync WhatsApp Data
+                </Button>
+
                 <Button
                   variant="outlined"
                   startIcon={<Iconify icon="solar:chat-circle-outline" />}
@@ -70,17 +77,19 @@ export default function TennexDashboard() {
                 >
                   Start WhatsApp Conversation
                 </Button>
-                
+
                 <Button
                   variant="outlined"
+                  href="/dashboard/user/account/integrations"
                   startIcon={<Iconify icon="solar:qr-code-outline" />}
                   sx={{ justifyContent: 'flex-start' }}
                 >
-                  Scan QR Code
+                  Manage Integrations
                 </Button>
-                
+
                 <Button
                   variant="outlined"
+                  href="/dashboard/user/account/general"
                   startIcon={<Iconify icon="solar:settings-outline" />}
                   sx={{ justifyContent: 'flex-start' }}
                 >
@@ -98,27 +107,21 @@ export default function TennexDashboard() {
               <Typography variant="h6" sx={{ mb: 2 }}>
                 System Status
               </Typography>
-              
+
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                   <Iconify icon="solar:check-circle-bold" color="success.main" />
-                  <Typography variant="body2">
-                    Authentication: Connected
-                  </Typography>
+                  <Typography variant="body2">Authentication: Connected</Typography>
                 </Box>
-                
+
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                   <Iconify icon="solar:wifi-router-outline" color="warning.main" />
-                  <Typography variant="body2">
-                    Backend Connection: Checking...
-                  </Typography>
+                  <Typography variant="body2">Backend Connection: Checking...</Typography>
                 </Box>
-                
+
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                   <Iconify icon="solar:smartphone-outline" color="info.main" />
-                  <Typography variant="body2">
-                    WhatsApp Bridge: Ready
-                  </Typography>
+                  <Typography variant="body2">WhatsApp Bridge: Ready</Typography>
                 </Box>
               </Box>
             </CardContent>

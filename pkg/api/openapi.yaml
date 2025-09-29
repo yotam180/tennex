@@ -263,6 +263,143 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
 
+  /sync/conversations/{integration_id}:
+    get:
+      summary: Sync conversations for a user integration
+      operationId: syncConversations
+      tags:
+        - Sync
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: integration_id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: User integration ID
+        - name: since_seq
+          in: query
+          required: false
+          schema:
+            type: integer
+            format: int64
+            default: 0
+          description: Fetch conversations since this sequence number
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 100
+            maximum: 1000
+      responses:
+        '200':
+          description: Conversations synced successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SyncConversationsResponse'
+
+  /sync/messages/{integration_id}:
+    get:
+      summary: Sync messages for a user integration (across all conversations)
+      operationId: syncMessages
+      tags:
+        - Sync
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: integration_id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: User integration ID
+        - name: since_seq
+          in: query
+          required: false
+          schema:
+            type: integer
+            format: int64
+            default: 0
+          description: Fetch messages since this sequence number
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 1500
+            maximum: 2000
+      responses:
+        '200':
+          description: Messages synced successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SyncMessagesResponse'
+
+  /sync/contacts/{integration_id}:
+    get:
+      summary: Sync contacts for a user integration
+      operationId: syncContacts
+      tags:
+        - Sync
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: integration_id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: User integration ID
+        - name: since_seq
+          in: query
+          required: false
+          schema:
+            type: integer
+            format: int64
+            default: 0
+          description: Fetch contacts since this sequence number
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 500
+            maximum: 1000
+      responses:
+        '200':
+          description: Contacts synced successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SyncContactsResponse'
+
+  /sync/status/{integration_id}:
+    get:
+      summary: Get current sync status for a user integration
+      operationId: getSyncStatus
+      tags:
+        - Sync
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: integration_id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: User integration ID
+      responses:
+        '200':
+          description: Sync status retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SyncStatusResponse'
+
 components:
   securitySchemes:
     bearerAuth:
@@ -561,6 +698,227 @@ components:
         full_name:
           type: string
           description: Full name
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    SyncConversationsResponse:
+      type: object
+      required:
+        - conversations
+        - latest_seq
+        - has_more
+      properties:
+        conversations:
+          type: array
+          items:
+            $ref: '#/components/schemas/Conversation'
+        latest_seq:
+          type: integer
+          format: int64
+          description: Latest sequence number in this batch (use as cursor for next request)
+        has_more:
+          type: boolean
+          description: Whether more conversations are available
+        total_count:
+          type: integer
+          description: Total count of new conversations
+
+    SyncMessagesResponse:
+      type: object
+      required:
+        - messages
+        - latest_seq
+        - has_more
+      properties:
+        messages:
+          type: array
+          items:
+            $ref: '#/components/schemas/Message'
+        latest_seq:
+          type: integer
+          format: int64
+          description: Latest sequence number in this batch (use as cursor for next request)
+        has_more:
+          type: boolean
+          description: Whether more messages are available
+        total_count:
+          type: integer
+          description: Total count of new messages
+
+    SyncContactsResponse:
+      type: object
+      required:
+        - contacts
+        - latest_seq
+        - has_more
+      properties:
+        contacts:
+          type: array
+          items:
+            $ref: '#/components/schemas/Contact'
+        latest_seq:
+          type: integer
+          format: int64
+          description: Latest sequence number in this batch (use as cursor for next request)
+        has_more:
+          type: boolean
+          description: Whether more contacts are available
+        total_count:
+          type: integer
+          description: Total count of new contacts
+
+    SyncStatusResponse:
+      type: object
+      required:
+        - latest_conversation_seq
+        - latest_message_seq
+        - latest_contact_seq
+      properties:
+        latest_conversation_seq:
+          type: integer
+          format: int64
+          description: Current latest conversation sequence number
+        latest_message_seq:
+          type: integer
+          format: int64
+          description: Current latest message sequence number
+        latest_contact_seq:
+          type: integer
+          format: int64
+          description: Current latest contact sequence number
+
+    Conversation:
+      type: object
+      properties:
+        seq:
+          type: integer
+          format: int64
+        id:
+          type: string
+          format: uuid
+        user_integration_id:
+          type: integer
+        external_conversation_id:
+          type: string
+        integration_type:
+          type: string
+        conversation_type:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        avatar_url:
+          type: string
+        is_archived:
+          type: boolean
+        is_pinned:
+          type: boolean
+        is_muted:
+          type: boolean
+        unread_count:
+          type: integer
+        total_message_count:
+          type: integer
+        last_message_at:
+          type: string
+          format: date-time
+        last_activity_at:
+          type: string
+          format: date-time
+        platform_metadata:
+          type: object
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    Message:
+      type: object
+      properties:
+        seq:
+          type: integer
+          format: int64
+        id:
+          type: string
+          format: uuid
+        conversation_id:
+          type: string
+          format: uuid
+        external_message_id:
+          type: string
+        integration_type:
+          type: string
+        sender_external_id:
+          type: string
+        sender_display_name:
+          type: string
+        message_type:
+          type: string
+        content:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+        is_from_me:
+          type: boolean
+        is_forwarded:
+          type: boolean
+        is_deleted:
+          type: boolean
+        delivery_status:
+          type: string
+        platform_metadata:
+          type: object
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    Contact:
+      type: object
+      properties:
+        seq:
+          type: integer
+          format: int64
+        id:
+          type: string
+          format: uuid
+        user_integration_id:
+          type: integer
+        external_contact_id:
+          type: string
+        integration_type:
+          type: string
+        display_name:
+          type: string
+        first_name:
+          type: string
+        last_name:
+          type: string
+        phone_number:
+          type: string
+        username:
+          type: string
+        is_blocked:
+          type: boolean
+        is_favorite:
+          type: boolean
+        last_seen:
+          type: string
+          format: date-time
+        avatar_url:
+          type: string
+        platform_metadata:
+          type: object
         created_at:
           type: string
           format: date-time

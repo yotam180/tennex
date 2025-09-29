@@ -420,3 +420,48 @@ SELECT COUNT(*) as total_messages,
 FROM messages
 WHERE conversation_id = $1::uuid
     AND is_deleted = false;
+-- name: ListUserIntegrationMessagesSinceSeq :many
+-- Fetch all messages for a user integration since a sequence number (for sync)
+SELECT m.seq,
+    m.id,
+    m.conversation_id,
+    m.external_message_id,
+    m.external_server_id,
+    m.integration_type,
+    m.sender_external_id,
+    m.sender_display_name,
+    m.message_type,
+    m.content,
+    m.timestamp,
+    m.edit_timestamp,
+    m.is_from_me,
+    m.is_forwarded,
+    m.is_deleted,
+    m.deleted_at,
+    m.reply_to_message_id,
+    m.reply_to_external_id,
+    m.delivery_status,
+    m.platform_metadata,
+    m.created_at,
+    m.updated_at
+FROM messages m
+    JOIN conversations c ON m.conversation_id = c.id
+WHERE c.user_integration_id = @user_integration_id::int
+    AND m.seq > @since_seq::bigint
+    AND m.is_deleted = false
+ORDER BY m.seq ASC
+LIMIT @limit_count::int;
+-- name: GetUserIntegrationLatestMessageSeq :one
+-- Get the latest message sequence number for a user integration
+SELECT COALESCE(MAX(m.seq), 0) as latest_seq
+FROM messages m
+    JOIN conversations c ON m.conversation_id = c.id
+WHERE c.user_integration_id = @user_integration_id::int;
+-- name: CountUserIntegrationMessagesSinceSeq :one
+-- Count messages since a sequence number (for progress tracking)
+SELECT COUNT(*)
+FROM messages m
+    JOIN conversations c ON m.conversation_id = c.id
+WHERE c.user_integration_id = @user_integration_id::int
+    AND m.seq > @since_seq::bigint
+    AND m.is_deleted = false;

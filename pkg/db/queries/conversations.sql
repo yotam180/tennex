@@ -319,3 +319,38 @@ SELECT id,
 FROM conversations
 WHERE user_integration_id = @user_integration_id::int
     AND external_conversation_id = @external_conversation_id::text;
+-- name: ListUserIntegrationConversationsSinceSeq :many
+-- Fetch conversations for a user integration since a sequence number (for sync)
+SELECT seq,
+    id,
+    user_integration_id,
+    external_conversation_id,
+    integration_type,
+    conversation_type,
+    name,
+    description,
+    avatar_url,
+    is_archived,
+    is_pinned,
+    is_muted,
+    mute_until,
+    is_read_only,
+    is_locked,
+    unread_count,
+    unread_mention_count,
+    total_message_count,
+    last_message_at,
+    last_activity_at,
+    platform_metadata,
+    created_at,
+    updated_at
+FROM conversations
+WHERE user_integration_id = @user_integration_id::int
+    AND seq > @since_seq::bigint
+ORDER BY seq ASC
+LIMIT @limit_count::int;
+-- name: GetUserIntegrationLatestConversationSeq :one
+-- Get the latest conversation sequence number for a user integration
+SELECT COALESCE(MAX(seq), 0) as latest_seq
+FROM conversations
+WHERE user_integration_id = @user_integration_id::int;

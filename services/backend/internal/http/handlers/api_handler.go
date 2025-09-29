@@ -24,6 +24,7 @@ type APIHandler struct {
 	outboxService      *core.OutboxService
 	accountService     *core.AccountService
 	integrationService *core.IntegrationService
+	queries            *dbgen.Queries
 	authHandler        *AuthHandler
 	jwtConfig          *auth.JWTConfig
 	logger             *zap.Logger
@@ -39,6 +40,7 @@ func NewAPIHandler(eventService *core.EventService, outboxService *core.OutboxSe
 		outboxService:      outboxService,
 		accountService:     accountService,
 		integrationService: integrationService,
+		queries:            queries,
 		authHandler:        authHandler,
 		jwtConfig:          jwtConfig,
 		logger:             logger.Named("api_handler"),
@@ -62,6 +64,12 @@ func (h *APIHandler) Routes() chi.Router {
 	r.Get("/accounts", h.ListAccounts)
 	r.Get("/accounts/{account_id}", h.GetAccount)
 	r.Get("/settings", h.GetSettings)
+
+	// Data sync endpoints
+	r.Get("/sync/conversations/{integration_id}", h.SyncConversations)
+	r.Get("/sync/messages/{integration_id}", h.SyncMessages)
+	r.Get("/sync/contacts/{integration_id}", h.SyncContacts)
+	r.Get("/sync/status/{integration_id}", h.GetSyncStatus)
 
 	return r
 }
@@ -433,4 +441,239 @@ func (h *APIHandler) convertAccountToAPI(account repo.Account) map[string]interf
 	}
 
 	return result
+}
+
+// SyncConversations handles conversation sync requests
+func (h *APIHandler) SyncConversations(w http.ResponseWriter, r *http.Request) {
+	integrationIDStr := chi.URLParam(r, "integration_id")
+	integrationID, err := strconv.Atoi(integrationIDStr)
+	if err != nil {
+		h.writeError(w, http.StatusBadRequest, "Invalid integration_id", err)
+		return
+	}
+
+	sinceSeqStr := r.URL.Query().Get("since_seq")
+	sinceSeq := int64(0)
+	if sinceSeqStr != "" {
+		sinceSeq, err = strconv.ParseInt(sinceSeqStr, 10, 64)
+		if err != nil {
+			h.writeError(w, http.StatusBadRequest, "Invalid since_seq parameter", err)
+			return
+		}
+	}
+
+	limitStr := r.URL.Query().Get("limit")
+	limit := int32(100)
+	if limitStr != "" {
+		limitInt, err := strconv.Atoi(limitStr)
+		if err != nil || limitInt < 1 || limitInt > 1000 {
+			h.writeError(w, http.StatusBadRequest, "Invalid limit parameter (must be 1-1000)", nil)
+			return
+		}
+		limit = int32(limitInt)
+	}
+
+	conversations, err := h.queries.ListUserIntegrationConversationsSinceSeq(r.Context(), dbgen.ListUserIntegrationConversationsSinceSeqParams{
+		UserIntegrationID: int32(integrationID),
+		SinceSeq:          sinceSeq,
+		LimitCount:        limit,
+	})
+	if err != nil {
+		h.writeError(w, http.StatusInternalServerError, "Failed to fetch conversations", err)
+		return
+	}
+
+	// Get latest seq
+	latestSeq := sinceSeq
+	if len(conversations) > 0 {
+		latestSeq = conversations[len(conversations)-1].Seq.Int64
+	}
+
+	hasMore := len(conversations) == int(limit)
+
+	response := map[string]interface{}{
+		"conversations": conversations,
+		"latest_seq":    latestSeq,
+		"has_more":      hasMore,
+		"total_count":   len(conversations),
+	}
+
+	h.logger.Debug("Sync conversations response",
+		zap.Int("integration_id", integrationID),
+		zap.Int64("since_seq", sinceSeq),
+		zap.Int("count", len(conversations)),
+		zap.Bool("has_more", hasMore))
+
+	h.writeJSON(w, http.StatusOK, response)
+}
+
+// SyncMessages handles message sync requests
+func (h *APIHandler) SyncMessages(w http.ResponseWriter, r *http.Request) {
+	integrationIDStr := chi.URLParam(r, "integration_id")
+	integrationID, err := strconv.Atoi(integrationIDStr)
+	if err != nil {
+		h.writeError(w, http.StatusBadRequest, "Invalid integration_id", err)
+		return
+	}
+
+	sinceSeqStr := r.URL.Query().Get("since_seq")
+	sinceSeq := int64(0)
+	if sinceSeqStr != "" {
+		sinceSeq, err = strconv.ParseInt(sinceSeqStr, 10, 64)
+		if err != nil {
+			h.writeError(w, http.StatusBadRequest, "Invalid since_seq parameter", err)
+			return
+		}
+	}
+
+	limitStr := r.URL.Query().Get("limit")
+	limit := int32(1500)
+	if limitStr != "" {
+		limitInt, err := strconv.Atoi(limitStr)
+		if err != nil || limitInt < 1 || limitInt > 2000 {
+			h.writeError(w, http.StatusBadRequest, "Invalid limit parameter (must be 1-2000)", nil)
+			return
+		}
+		limit = int32(limitInt)
+	}
+
+	messages, err := h.queries.ListUserIntegrationMessagesSinceSeq(r.Context(), dbgen.ListUserIntegrationMessagesSinceSeqParams{
+		UserIntegrationID: int32(integrationID),
+		SinceSeq:          sinceSeq,
+		LimitCount:        limit,
+	})
+	if err != nil {
+		h.writeError(w, http.StatusInternalServerError, "Failed to fetch messages", err)
+		return
+	}
+
+	// Get latest seq
+	latestSeq := sinceSeq
+	if len(messages) > 0 {
+		latestSeq = messages[len(messages)-1].Seq.Int64
+	}
+
+	hasMore := len(messages) == int(limit)
+
+	response := map[string]interface{}{
+		"messages":    messages,
+		"latest_seq":  latestSeq,
+		"has_more":    hasMore,
+		"total_count": len(messages),
+	}
+
+	h.logger.Debug("Sync messages response",
+		zap.Int("integration_id", integrationID),
+		zap.Int64("since_seq", sinceSeq),
+		zap.Int("count", len(messages)),
+		zap.Bool("has_more", hasMore))
+
+	h.writeJSON(w, http.StatusOK, response)
+}
+
+// SyncContacts handles contact sync requests
+func (h *APIHandler) SyncContacts(w http.ResponseWriter, r *http.Request) {
+	integrationIDStr := chi.URLParam(r, "integration_id")
+	integrationID, err := strconv.Atoi(integrationIDStr)
+	if err != nil {
+		h.writeError(w, http.StatusBadRequest, "Invalid integration_id", err)
+		return
+	}
+
+	sinceSeqStr := r.URL.Query().Get("since_seq")
+	sinceSeq := int64(0)
+	if sinceSeqStr != "" {
+		sinceSeq, err = strconv.ParseInt(sinceSeqStr, 10, 64)
+		if err != nil {
+			h.writeError(w, http.StatusBadRequest, "Invalid since_seq parameter", err)
+			return
+		}
+	}
+
+	limitStr := r.URL.Query().Get("limit")
+	limit := int32(500)
+	if limitStr != "" {
+		limitInt, err := strconv.Atoi(limitStr)
+		if err != nil || limitInt < 1 || limitInt > 1000 {
+			h.writeError(w, http.StatusBadRequest, "Invalid limit parameter (must be 1-1000)", nil)
+			return
+		}
+		limit = int32(limitInt)
+	}
+
+	contacts, err := h.queries.ListUserIntegrationContactsSinceSeq(r.Context(), dbgen.ListUserIntegrationContactsSinceSeqParams{
+		UserIntegrationID: int32(integrationID),
+		SinceSeq:          sinceSeq,
+		LimitCount:        limit,
+	})
+	if err != nil {
+		h.writeError(w, http.StatusInternalServerError, "Failed to fetch contacts", err)
+		return
+	}
+
+	// Get latest seq
+	latestSeq := sinceSeq
+	if len(contacts) > 0 {
+		latestSeq = contacts[len(contacts)-1].Seq.Int64
+	}
+
+	hasMore := len(contacts) == int(limit)
+
+	response := map[string]interface{}{
+		"contacts":    contacts,
+		"latest_seq":  latestSeq,
+		"has_more":    hasMore,
+		"total_count": len(contacts),
+	}
+
+	h.logger.Debug("Sync contacts response",
+		zap.Int("integration_id", integrationID),
+		zap.Int64("since_seq", sinceSeq),
+		zap.Int("count", len(contacts)),
+		zap.Bool("has_more", hasMore))
+
+	h.writeJSON(w, http.StatusOK, response)
+}
+
+// GetSyncStatus handles sync status requests
+func (h *APIHandler) GetSyncStatus(w http.ResponseWriter, r *http.Request) {
+	integrationIDStr := chi.URLParam(r, "integration_id")
+	integrationID, err := strconv.Atoi(integrationIDStr)
+	if err != nil {
+		h.writeError(w, http.StatusBadRequest, "Invalid integration_id", err)
+		return
+	}
+
+	// Get latest seq numbers for each entity type
+	latestConvSeq, err := h.queries.GetUserIntegrationLatestConversationSeq(r.Context(), int32(integrationID))
+	if err != nil {
+		h.writeError(w, http.StatusInternalServerError, "Failed to get latest conversation seq", err)
+		return
+	}
+
+	latestMsgSeq, err := h.queries.GetUserIntegrationLatestMessageSeq(r.Context(), int32(integrationID))
+	if err != nil {
+		h.writeError(w, http.StatusInternalServerError, "Failed to get latest message seq", err)
+		return
+	}
+
+	latestContactSeq, err := h.queries.GetUserIntegrationLatestContactSeq(r.Context(), int32(integrationID))
+	if err != nil {
+		h.writeError(w, http.StatusInternalServerError, "Failed to get latest contact seq", err)
+		return
+	}
+
+	response := map[string]interface{}{
+		"latest_conversation_seq": latestConvSeq,
+		"latest_message_seq":      latestMsgSeq,
+		"latest_contact_seq":      latestContactSeq,
+	}
+
+	h.logger.Debug("Sync status response",
+		zap.Int("integration_id", integrationID),
+		zap.Any("latest_conv_seq", latestConvSeq),
+		zap.Any("latest_msg_seq", latestMsgSeq),
+		zap.Any("latest_contact_seq", latestContactSeq))
+
+	h.writeJSON(w, http.StatusOK, response)
 }
