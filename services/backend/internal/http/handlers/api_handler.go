@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"strconv"
 	"time"
@@ -14,27 +15,33 @@ import (
 	"github.com/tennex/backend/internal/repo"
 	dbgen "github.com/tennex/pkg/db/gen"
 	"github.com/tennex/pkg/events"
+	"github.com/tennex/shared/auth"
 )
 
 // APIHandler handles HTTP API requests
 type APIHandler struct {
-	eventService   *core.EventService
-	outboxService  *core.OutboxService
-	accountService *core.AccountService
-	authHandler    *AuthHandler
-	logger         *zap.Logger
+	eventService       *core.EventService
+	outboxService      *core.OutboxService
+	accountService     *core.AccountService
+	integrationService *core.IntegrationService
+	authHandler        *AuthHandler
+	jwtConfig          *auth.JWTConfig
+	logger             *zap.Logger
 }
 
 // NewAPIHandler creates a new API handler
-func NewAPIHandler(eventService *core.EventService, outboxService *core.OutboxService, accountService *core.AccountService, queries *dbgen.Queries, jwtSecret string, logger *zap.Logger) *APIHandler {
+func NewAPIHandler(eventService *core.EventService, outboxService *core.OutboxService, accountService *core.AccountService, integrationService *core.IntegrationService, queries *dbgen.Queries, jwtSecret string, logger *zap.Logger) *APIHandler {
 	authHandler := NewAuthHandler(queries, jwtSecret, logger)
+	jwtConfig := auth.DefaultJWTConfig(jwtSecret)
 
 	return &APIHandler{
-		eventService:   eventService,
-		outboxService:  outboxService,
-		accountService: accountService,
-		authHandler:    authHandler,
-		logger:         logger.Named("api_handler"),
+		eventService:       eventService,
+		outboxService:      outboxService,
+		accountService:     accountService,
+		integrationService: integrationService,
+		authHandler:        authHandler,
+		jwtConfig:          jwtConfig,
+		logger:             logger.Named("api_handler"),
 	}
 }
 
@@ -54,6 +61,7 @@ func (h *APIHandler) Routes() chi.Router {
 	r.Get("/qr", h.GetQRCode)
 	r.Get("/accounts", h.ListAccounts)
 	r.Get("/accounts/{account_id}", h.GetAccount)
+	r.Get("/settings", h.GetSettings)
 
 	return r
 }
@@ -328,6 +336,79 @@ func (h *APIHandler) convertAccountsToAPI(accounts []repo.Account) []map[string]
 		result[i] = h.convertAccountToAPI(account)
 	}
 	return result
+}
+
+// GetSettings handles user settings requests
+func (h *APIHandler) GetSettings(w http.ResponseWriter, r *http.Request) {
+	// Extract user ID from JWT token (same pattern as auth handler)
+	userID, err := h.extractUserFromToken(r)
+	if err != nil {
+		h.writeError(w, http.StatusUnauthorized, "Invalid or missing token", err)
+		return
+	}
+
+	// Get user's WhatsApp integration information
+	whatsappIntegration, err := h.integrationService.GetWhatsAppIntegration(r.Context(), userID)
+	if err != nil {
+		// If integration doesn't exist, return default settings (no WhatsApp connected)
+		h.logger.Debug("WhatsApp integration not found, returning default settings",
+			zap.String("user_id", userID.String()),
+			zap.Error(err))
+
+		response := map[string]interface{}{
+			"user_id": userID,
+			"whatsapp": map[string]interface{}{
+				"connected": false,
+				"status":    "disconnected",
+			},
+		}
+		h.writeJSON(w, http.StatusOK, response)
+		return
+	}
+
+	// Build WhatsApp connection info
+	whatsappInfo := map[string]interface{}{
+		"connected": whatsappIntegration.Status == "connected",
+		"status":    whatsappIntegration.Status,
+		"wa_jid":    whatsappIntegration.ExternalID,
+	}
+
+	if whatsappIntegration.DisplayName.Valid {
+		whatsappInfo["display_name"] = whatsappIntegration.DisplayName.String
+	}
+	if whatsappIntegration.AvatarUrl.Valid {
+		whatsappInfo["avatar_url"] = whatsappIntegration.AvatarUrl.String
+	}
+	if whatsappIntegration.LastSeen.Valid {
+		whatsappInfo["last_seen"] = whatsappIntegration.LastSeen.Time
+	}
+
+	response := map[string]interface{}{
+		"user_id":  userID,
+		"whatsapp": whatsappInfo,
+	}
+
+	h.logger.Debug("Settings retrieved", zap.String("user_id", userID.String()))
+	h.writeJSON(w, http.StatusOK, response)
+}
+
+// Helper methods
+
+func (h *APIHandler) extractUserFromToken(r *http.Request) (uuid.UUID, error) {
+	// Extract token from Authorization header
+	authHeader := r.Header.Get("Authorization")
+	tokenString, err := auth.ExtractTokenFromHeader(authHeader)
+	if err != nil {
+		return uuid.Nil, errors.New("missing or malformed token")
+	}
+
+	// Validate token using JWT config
+	claims, err := h.jwtConfig.ValidateToken(tokenString)
+	if err != nil {
+		return uuid.Nil, errors.New("invalid token")
+	}
+
+	return claims.UserID, nil
 }
 
 func (h *APIHandler) convertAccountToAPI(account repo.Account) map[string]interface{} {

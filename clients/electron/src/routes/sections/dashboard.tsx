@@ -53,6 +53,9 @@ const AccountNotificationsPage = lazy(
 const AccountChangePasswordPage = lazy(
   () => import('src/pages/dashboard/user/account/change-password')
 );
+const AccountIntegrationsPage = lazy(
+  () => import('src/pages/dashboard/user/account/integrations')
+);
 // Blog
 const BlogPostsPage = lazy(() => import('src/pages/dashboard/post/list'));
 const BlogPostPage = lazy(() => import('src/pages/dashboard/post/details'));
@@ -136,6 +139,7 @@ export const dashboardRoutes: RouteObject[] = [
               { path: 'notifications', element: <AccountNotificationsPage /> },
               { path: 'socials', element: <AccountSocialsPage /> },
               { path: 'change-password', element: <AccountChangePasswordPage /> },
+              { path: 'integrations', element: <AccountIntegrationsPage /> },
             ],
           },
         ],

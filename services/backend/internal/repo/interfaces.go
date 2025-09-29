@@ -144,3 +144,12 @@ type AccountRepository interface {
 	ListAccounts(ctx context.Context, params ListAccountsParams) ([]Account, error)
 	GetConnectedAccounts(ctx context.Context) ([]Account, error)
 }
+
+type IntegrationRepository interface {
+	UpsertUserIntegration(ctx context.Context, params UpsertUserIntegrationParams) (UserIntegration, error)
+	GetUserIntegration(ctx context.Context, userID uuid.UUID, integrationType string) (UserIntegration, error)
+	GetUserIntegrationByExternalID(ctx context.Context, integrationType, externalID string) (UserIntegration, error)
+	ListUserIntegrations(ctx context.Context, userID uuid.UUID) ([]UserIntegration, error)
+	UpdateUserIntegrationStatus(ctx context.Context, userID uuid.UUID, integrationType, status string, lastSeen sql.NullTime) error
+	DeleteUserIntegration(ctx context.Context, userID uuid.UUID, integrationType string) error
+}

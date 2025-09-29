@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/google/uuid"
 	"go.uber.org/zap"
 
 	"github.com/tennex/backend/internal/core"
@@ -13,19 +14,21 @@ import (
 // BridgeServer implements the bridge gRPC service
 type BridgeServer struct {
 	bridgev1.UnimplementedBridgeServiceServer
-	eventService   *core.EventService
-	outboxService  *core.OutboxService
-	accountService *core.AccountService
-	logger         *zap.Logger
+	eventService       *core.EventService
+	outboxService      *core.OutboxService
+	accountService     *core.AccountService
+	integrationService *core.IntegrationService
+	logger             *zap.Logger
 }
 
 // NewBridgeServer creates a new bridge gRPC server
-func NewBridgeServer(eventService *core.EventService, outboxService *core.OutboxService, accountService *core.AccountService, logger *zap.Logger) *BridgeServer {
+func NewBridgeServer(eventService *core.EventService, outboxService *core.OutboxService, accountService *core.AccountService, integrationService *core.IntegrationService, logger *zap.Logger) *BridgeServer {
 	return &BridgeServer{
-		eventService:   eventService,
-		outboxService:  outboxService,
-		accountService: accountService,
-		logger:         logger.Named("bridge_server"),
+		eventService:       eventService,
+		outboxService:      outboxService,
+		accountService:     accountService,
+		integrationService: integrationService,
+		logger:             logger.Named("bridge_server"),
 	}
 }
 
@@ -52,16 +55,25 @@ func (s *BridgeServer) UpdateAccountStatus(ctx context.Context, req *bridgev1.Up
 	// Convert proto status to string
 	status := convertProtoStatusToString(req.Status)
 
-	// Use UpsertAccount to create or update the account with WhatsApp info
-	_, err := s.accountService.UpsertAccount(ctx, req.AccountId, waJid, displayName, avatarUrl, status, lastSeen)
+	// Parse account ID as UUID
+	userID, err := uuid.Parse(req.AccountId)
 	if err != nil {
-		s.logger.Error("Failed to upsert account",
+		s.logger.Error("Failed to parse account_id as UUID",
 			zap.String("account_id", req.AccountId),
 			zap.Error(err))
 		return nil, err
 	}
 
-	s.logger.Info("Account status updated successfully",
+	// Use UpsertUserIntegration to create or update the WhatsApp integration
+	_, err = s.integrationService.UpsertUserIntegration(ctx, userID, core.IntegrationTypeWhatsApp, waJid, displayName, avatarUrl, status, nil, lastSeen)
+	if err != nil {
+		s.logger.Error("Failed to upsert WhatsApp integration",
+			zap.String("account_id", req.AccountId),
+			zap.Error(err))
+		return nil, err
+	}
+
+	s.logger.Info("WhatsApp integration updated successfully",
 		zap.String("account_id", req.AccountId),
 		zap.String("wa_jid", waJid),
 		zap.String("status", status))

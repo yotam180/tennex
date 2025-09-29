@@ -117,6 +117,7 @@ func main() {
 	eventRepo := repo.NewEventRepository(dbPool)
 	outboxRepo := repo.NewOutboxRepository(dbPool)
 	accountRepo := repo.NewAccountRepository(dbPool)
+	integrationRepo := repo.NewIntegrationRepository(dbPool)
 
 	// Create database queries for generated code
 	queries := dbgen.New(dbPool)
@@ -125,6 +126,7 @@ func main() {
 	eventService := core.NewEventService(eventRepo, natsConn, logger)
 	outboxService := core.NewOutboxService(outboxRepo, eventRepo, logger)
 	accountService := core.NewAccountService(accountRepo, logger)
+	integrationService := core.NewIntegrationService(integrationRepo, logger)
 
 	// Setup servers
 	var wg sync.WaitGroup
@@ -140,7 +142,7 @@ func main() {
 			Port: config.HTTP.Port,
 			Host: config.HTTP.Host,
 		}
-		if err := runHTTPServer(ctx, httpConfig, eventService, outboxService, accountService, queries, config.Auth.JWTSecret, logger); err != nil {
+		if err := runHTTPServer(ctx, httpConfig, eventService, outboxService, accountService, integrationService, queries, config.Auth.JWTSecret, logger); err != nil {
 			logger.Error("HTTP server error", zap.Error(err))
 		}
 	}()
@@ -156,7 +158,7 @@ func main() {
 			Port: config.GRPC.Port,
 			Host: config.GRPC.Host,
 		}
-		if err := runGRPCServer(ctx, grpcConfig, eventService, outboxService, accountService, logger); err != nil {
+		if err := runGRPCServer(ctx, grpcConfig, eventService, outboxService, accountService, integrationService, logger); err != nil {
 			logger.Error("gRPC server error", zap.Error(err))
 		}
 	}()
@@ -309,7 +311,7 @@ func setupNATS(url string, logger *zap.Logger) (*nats.Conn, error) {
 func runHTTPServer(ctx context.Context, httpConfig struct {
 	Port int
 	Host string
-}, eventService *core.EventService, outboxService *core.OutboxService, accountService *core.AccountService, queries *dbgen.Queries, jwtSecret string, logger *zap.Logger) error {
+}, eventService *core.EventService, outboxService *core.OutboxService, accountService *core.AccountService, integrationService *core.IntegrationService, queries *dbgen.Queries, jwtSecret string, logger *zap.Logger) error {
 
 	router := chi.NewRouter()
 
@@ -331,7 +333,7 @@ func runHTTPServer(ctx context.Context, httpConfig struct {
 	}))
 
 	// API handlers
-	apiHandler := handlers.NewAPIHandler(eventService, outboxService, accountService, queries, jwtSecret, logger)
+	apiHandler := handlers.NewAPIHandler(eventService, outboxService, accountService, integrationService, queries, jwtSecret, logger)
 	router.Mount("/", apiHandler.Routes())
 
 	addr := fmt.Sprintf("%s:%d", httpConfig.Host, httpConfig.Port)
@@ -367,7 +369,7 @@ func runHTTPServer(ctx context.Context, httpConfig struct {
 func runGRPCServer(ctx context.Context, grpcConfig struct {
 	Port int
 	Host string
-}, eventService *core.EventService, outboxService *core.OutboxService, accountService *core.AccountService, logger *zap.Logger) error {
+}, eventService *core.EventService, outboxService *core.OutboxService, accountService *core.AccountService, integrationService *core.IntegrationService, logger *zap.Logger) error {
 
 	addr := fmt.Sprintf("%s:%d", grpcConfig.Host, grpcConfig.Port)
 	listener, err := net.Listen("tcp", addr)
@@ -376,7 +378,7 @@ func runGRPCServer(ctx context.Context, grpcConfig struct {
 	}
 
 	grpcServer := grpc.NewServer()
-	bridgeServer := server.NewBridgeServer(eventService, outboxService, accountService, logger)
+	bridgeServer := server.NewBridgeServer(eventService, outboxService, accountService, integrationService, logger)
 
 	// Register the gRPC service
 	bridgev1.RegisterBridgeServiceServer(grpcServer, bridgeServer)

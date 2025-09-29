@@ -30,7 +30,7 @@ export function OverviewAppView() {
   const { user } = useMockedUser();
 
   const theme = useTheme();
-
+  
   return (
     <DashboardContent maxWidth="xl">
       {/* Quick Link to WhatsApp Sync */}

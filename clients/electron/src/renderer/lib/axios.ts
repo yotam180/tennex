@@ -40,6 +40,7 @@ export const endpoints = {
     signUp: '/auth/register' 
   },
   qr: '/qr',
+  settings: '/settings',
   // Template endpoints (kept for compatibility)
   chat: '/api/chat',
   kanban: '/api/kanban',

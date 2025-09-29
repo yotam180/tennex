@@ -1,47 +1,54 @@
--- Accounts table queries
--- WhatsApp account management
+-- User Integrations table queries
+-- Multi-platform integration management (WhatsApp, Email, Telegram, etc.)
 
--- name: UpsertAccount :one
-INSERT INTO accounts (
-    id, wa_jid, display_name, avatar_url, status, last_seen
+-- name: UpsertUserIntegration :one
+INSERT INTO user_integrations (
+    user_id, integration_type, external_id, status, display_name, avatar_url, metadata, last_seen
 ) VALUES (
-    $1, $2, $3, $4, $5, $6
-) ON CONFLICT (id) DO UPDATE SET
-    wa_jid = EXCLUDED.wa_jid,
+    $1, $2, $3, $4, $5, $6, $7, $8
+) ON CONFLICT (user_id, integration_type) DO UPDATE SET
+    external_id = EXCLUDED.external_id,
+    status = EXCLUDED.status,
     display_name = EXCLUDED.display_name,
     avatar_url = EXCLUDED.avatar_url,
-    status = EXCLUDED.status,
+    metadata = EXCLUDED.metadata,
     last_seen = EXCLUDED.last_seen,
     updated_at = NOW()
-RETURNING id, wa_jid, display_name, avatar_url, status, last_seen, created_at, updated_at;
+RETURNING id, user_id, integration_type, external_id, status, display_name, avatar_url, metadata, last_seen, created_at, updated_at;
 
--- name: GetAccount :one
-SELECT id, wa_jid, display_name, avatar_url, status, last_seen, created_at, updated_at
-FROM accounts 
-WHERE id = $1;
+-- name: GetUserIntegration :one
+SELECT id, user_id, integration_type, external_id, status, display_name, avatar_url, metadata, last_seen, created_at, updated_at
+FROM user_integrations 
+WHERE user_id = $1 AND integration_type = $2;
 
--- name: GetAccountByWAJID :one
-SELECT id, wa_jid, display_name, avatar_url, status, last_seen, created_at, updated_at
-FROM accounts 
-WHERE wa_jid = $1;
+-- name: GetUserIntegrationByExternalID :one
+SELECT id, user_id, integration_type, external_id, status, display_name, avatar_url, metadata, last_seen, created_at, updated_at
+FROM user_integrations 
+WHERE integration_type = $1 AND external_id = $2;
 
--- name: UpdateAccountStatus :exec
-UPDATE accounts 
-SET status = $2, last_seen = $3, updated_at = NOW()
-WHERE id = $1;
+-- name: UpdateUserIntegrationStatus :exec
+UPDATE user_integrations 
+SET status = $3, last_seen = $4, updated_at = NOW()
+WHERE user_id = $1 AND integration_type = $2;
 
--- name: ListAccounts :many
-SELECT id, wa_jid, display_name, avatar_url, status, last_seen, created_at, updated_at
-FROM accounts 
-ORDER BY created_at DESC
-LIMIT $1 OFFSET $2;
+-- name: ListUserIntegrations :many
+SELECT id, user_id, integration_type, external_id, status, display_name, avatar_url, metadata, last_seen, created_at, updated_at
+FROM user_integrations 
+WHERE user_id = $1
+ORDER BY created_at DESC;
 
--- name: GetConnectedAccounts :many
-SELECT id, wa_jid, display_name, avatar_url, status, last_seen, created_at, updated_at
-FROM accounts 
+-- name: ListConnectedIntegrations :many
+SELECT id, user_id, integration_type, external_id, status, display_name, avatar_url, metadata, last_seen, created_at, updated_at
+FROM user_integrations 
 WHERE status = 'connected'
 ORDER BY last_seen DESC;
 
--- name: DeleteAccount :exec
-DELETE FROM accounts 
-WHERE id = $1;
+-- name: ListIntegrationsByType :many
+SELECT id, user_id, integration_type, external_id, status, display_name, avatar_url, metadata, last_seen, created_at, updated_at
+FROM user_integrations 
+WHERE integration_type = $1 AND status = 'connected'
+ORDER BY last_seen DESC;
+
+-- name: DeleteUserIntegration :exec
+DELETE FROM user_integrations 
+WHERE user_id = $1 AND integration_type = $2;
