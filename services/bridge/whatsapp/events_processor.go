@@ -20,7 +20,7 @@ import (
 
 // EventsProcessor handles WhatsApp events and sends them to the backend
 type EventsProcessor struct {
-	integrationClient *backendGRPC.IntegrationClient
+	integrationClient *backendGRPC.RecordingIntegrationClient
 	backendClient     *backendGRPC.BackendClient // Keep old client for compatibility
 	userID            string
 	userIntegrationID int32
@@ -28,7 +28,7 @@ type EventsProcessor struct {
 }
 
 // NewEventsProcessor creates a new events processor
-func NewEventsProcessor(integrationClient *backendGRPC.IntegrationClient, backendClient *backendGRPC.BackendClient, userID string) *EventsProcessor {
+func NewEventsProcessor(integrationClient *backendGRPC.RecordingIntegrationClient, backendClient *backendGRPC.BackendClient, userID string) *EventsProcessor {
 	return &EventsProcessor{
 		integrationClient: integrationClient,
 		backendClient:     backendClient,
@@ -48,60 +48,71 @@ func (p *EventsProcessor) SetIntegrationContext(userIntegrationID int32, waJID s
 }
 
 // ProcessEvent processes a WhatsApp event and sends it to the backend
+// On any error, it will panic to force disconnection for easier debugging
 func (p *EventsProcessor) ProcessEvent(ctx context.Context, evt interface{}) {
 	// Get event type name
 	eventType := reflect.TypeOf(evt).String()
 	log.Printf("\n🔔 Processing WhatsApp event: %s", eventType)
 
+	var err error
+
 	// Handle specific event types
 	switch v := evt.(type) {
 	case *events.Connected:
-		p.handleConnected(ctx, v)
+		err = p.handleConnected(ctx, v)
 
 	case *events.Disconnected:
-		p.handleDisconnected(ctx, v)
+		err = p.handleDisconnected(ctx, v)
 
 	case *events.LoggedOut:
-		p.handleLoggedOut(ctx, v)
+		err = p.handleLoggedOut(ctx, v)
 
 	case *events.HistorySync:
-		p.handleHistorySync(ctx, v)
+		err = p.handleHistorySync(ctx, v)
 
 	case *events.Message:
-		p.handleMessage(ctx, v)
+		err = p.handleMessage(ctx, v)
 
 	case *events.Receipt:
-		p.handleReceipt(ctx, v)
+		err = p.handleReceipt(ctx, v)
 
 	case *events.AppStateSyncComplete:
-		p.handleAppStateSyncComplete(ctx, v)
+		err = p.handleAppStateSyncComplete(ctx, v)
 
 	case *events.Contact:
-		p.handleContact(ctx, v)
+		err = p.handleContact(ctx, v)
 
 	case *events.PushName:
-		p.handlePushName(ctx, v)
+		err = p.handlePushName(ctx, v)
 
 	case *events.GroupInfo:
-		p.handleGroupInfo(ctx, v)
+		err = p.handleGroupInfo(ctx, v)
 
 	case *events.JoinedGroup:
-		p.handleJoinedGroup(ctx, v)
+		err = p.handleJoinedGroup(ctx, v)
 
 	case *events.Presence:
-		p.handlePresence(ctx, v)
+		err = p.handlePresence(ctx, v)
 
 	case *events.ChatPresence:
-		p.handleChatPresence(ctx, v)
+		err = p.handleChatPresence(ctx, v)
 
 	// Note: OfflineSyncPreview and OfflineSyncCompleted events don't exist in this whatsmeow version
 
 	default:
 		log.Printf("❓ Unhandled WhatsApp event type: %s", eventType)
+		return
+	}
+
+	// FAIL FAST: Panic on first error to force disconnection for debugging
+	if err != nil {
+		log.Printf("🚨 FATAL ERROR processing %s: %v", eventType, err)
+		log.Printf("🚨 Panicking to force disconnection for easier debugging")
+		panic(fmt.Sprintf("Event processing failed: %v", err))
 	}
 }
 
-func (p *EventsProcessor) handleConnected(ctx context.Context, evt *events.Connected) {
+func (p *EventsProcessor) handleConnected(ctx context.Context, evt *events.Connected) error {
 	log.Printf("🔗 WhatsApp Connected!")
 
 	if p.integrationCtx != nil {
@@ -115,12 +126,13 @@ func (p *EventsProcessor) handleConnected(ctx context.Context, evt *events.Conne
 			},
 		)
 		if err != nil {
-			log.Printf("❌ Failed to update connection status to connected: %v", err)
+			return fmt.Errorf("failed to update connection status to connected: %w", err)
 		}
 	}
+	return nil
 }
 
-func (p *EventsProcessor) handleDisconnected(ctx context.Context, evt *events.Disconnected) {
+func (p *EventsProcessor) handleDisconnected(ctx context.Context, evt *events.Disconnected) error {
 	log.Printf("❌ WhatsApp Disconnected")
 
 	if p.integrationCtx != nil {
@@ -134,12 +146,13 @@ func (p *EventsProcessor) handleDisconnected(ctx context.Context, evt *events.Di
 			},
 		)
 		if err != nil {
-			log.Printf("❌ Failed to update connection status to disconnected: %v", err)
+			return fmt.Errorf("failed to update connection status to disconnected: %w", err)
 		}
 	}
+	return nil
 }
 
-func (p *EventsProcessor) handleLoggedOut(ctx context.Context, evt *events.LoggedOut) {
+func (p *EventsProcessor) handleLoggedOut(ctx context.Context, evt *events.LoggedOut) error {
 	log.Printf("👋 WhatsApp Logged Out: reason=%s", evt.Reason)
 
 	if p.integrationCtx != nil {
@@ -154,18 +167,19 @@ func (p *EventsProcessor) handleLoggedOut(ctx context.Context, evt *events.Logge
 			},
 		)
 		if err != nil {
-			log.Printf("❌ Failed to update connection status to logged out: %v", err)
+			return fmt.Errorf("failed to update connection status to logged out: %w", err)
 		}
 	}
+	return nil
 }
 
-func (p *EventsProcessor) handleHistorySync(ctx context.Context, evt *events.HistorySync) {
+func (p *EventsProcessor) handleHistorySync(ctx context.Context, evt *events.HistorySync) error {
 	log.Printf("🔄 History Sync: type=%s, conversations=%d",
 		evt.Data.SyncType, len(evt.Data.Conversations))
 
 	if p.integrationCtx == nil {
 		log.Printf("⚠️  Integration context not set, skipping history sync")
-		return
+		return nil
 	}
 
 	// Process conversations
@@ -182,10 +196,9 @@ func (p *EventsProcessor) handleHistorySync(ctx context.Context, evt *events.His
 		if len(conversations) > 0 {
 			err := p.integrationClient.SyncConversations(ctx, p.integrationCtx, conversations, evt.Data.SyncType.String())
 			if err != nil {
-				log.Printf("❌ Failed to sync %d conversations: %v", len(conversations), err)
-			} else {
-				log.Printf("✅ Synced %d conversations from history", len(conversations))
+				return fmt.Errorf("failed to sync %d conversations: %w", len(conversations), err)
 			}
+			log.Printf("✅ Synced %d conversations from history", len(conversations))
 		}
 	}
 
@@ -210,83 +223,92 @@ func (p *EventsProcessor) handleHistorySync(ctx context.Context, evt *events.His
 		for conversationID, messages := range messagesByConversation {
 			err := p.integrationClient.SyncMessages(ctx, p.integrationCtx, conversationID, messages)
 			if err != nil {
-				log.Printf("❌ Failed to sync %d messages for conversation %s: %v", len(messages), conversationID, err)
-			} else {
-				log.Printf("✅ Synced %d messages for conversation %s from history", len(messages), conversationID)
+				return fmt.Errorf("failed to sync %d messages for conversation %s: %w", len(messages), conversationID, err)
 			}
+			log.Printf("✅ Synced %d messages for conversation %s from history", len(messages), conversationID)
 		}
 	}
+	return nil
 }
 
-func (p *EventsProcessor) handleMessage(ctx context.Context, evt *events.Message) {
+func (p *EventsProcessor) handleMessage(ctx context.Context, evt *events.Message) error {
 	log.Printf("📨 New Message: ID=%s, from=%s, chat=%s",
 		evt.Info.ID, evt.Info.Sender.String(), evt.Info.Chat.String())
 
 	if p.integrationCtx == nil {
 		log.Printf("⚠️  Integration context not set, skipping message")
-		return
+		return nil
 	}
 
 	protoMsg := p.convertMessage(evt)
 	if protoMsg == nil {
 		log.Printf("⚠️  Failed to convert message")
-		return
+		return nil
 	}
 
 	err := p.integrationClient.ProcessMessage(ctx, p.integrationCtx, protoMsg)
 	if err != nil {
-		log.Printf("❌ Failed to process real-time message: %v", err)
+		return fmt.Errorf("failed to process real-time message: %w", err)
 	}
+	return nil
 }
 
-func (p *EventsProcessor) handleReceipt(ctx context.Context, evt *events.Receipt) {
+func (p *EventsProcessor) handleReceipt(ctx context.Context, evt *events.Receipt) error {
 	log.Printf("✅ Message Receipt: type=%s, messages=%v, sender=%s",
 		evt.Type, evt.MessageIDs, evt.SourceString())
+	return nil
 }
 
-func (p *EventsProcessor) handleAppStateSyncComplete(ctx context.Context, evt *events.AppStateSyncComplete) {
+func (p *EventsProcessor) handleAppStateSyncComplete(ctx context.Context, evt *events.AppStateSyncComplete) error {
 	log.Printf("🔄 App State Sync Complete: %s", evt.Name)
+	return nil
 }
 
-func (p *EventsProcessor) handleContact(ctx context.Context, evt *events.Contact) {
+func (p *EventsProcessor) handleContact(ctx context.Context, evt *events.Contact) error {
 	log.Printf("👤 Contact Update: JID=%s", evt.JID.String())
 
 	if p.integrationCtx == nil {
 		log.Printf("⚠️  Integration context not set, skipping contact")
-		return
+		return nil
 	}
 
 	protoContact := p.convertContact(evt)
 	if protoContact == nil {
-		return
+		return nil
 	}
 
 	// Send single contact as a batch
 	contacts := []*proto.Contact{protoContact}
 	err := p.integrationClient.SyncContacts(ctx, p.integrationCtx, contacts)
 	if err != nil {
-		log.Printf("❌ Failed to sync contact update: %v", err)
+		return fmt.Errorf("failed to sync contact update: %w", err)
 	}
+	return nil
 }
 
-func (p *EventsProcessor) handlePushName(ctx context.Context, evt *events.PushName) {
+func (p *EventsProcessor) handlePushName(ctx context.Context, evt *events.PushName) error {
 	log.Printf("📛 Push Name Update: JID=%s, name=%s", evt.JID.String(), evt.Message.PushName)
+	return nil
 }
 
-func (p *EventsProcessor) handleGroupInfo(ctx context.Context, evt *events.GroupInfo) {
+func (p *EventsProcessor) handleGroupInfo(ctx context.Context, evt *events.GroupInfo) error {
 	log.Printf("👥 Group Info Update: JID=%s, name=%s", evt.JID.String(), evt.Name.Name)
+	return nil
 }
 
-func (p *EventsProcessor) handleJoinedGroup(ctx context.Context, evt *events.JoinedGroup) {
+func (p *EventsProcessor) handleJoinedGroup(ctx context.Context, evt *events.JoinedGroup) error {
 	log.Printf("🎉 Joined Group: JID=%s, reason=%s", evt.JID.String(), evt.Reason)
+	return nil
 }
 
-func (p *EventsProcessor) handlePresence(ctx context.Context, evt *events.Presence) {
+func (p *EventsProcessor) handlePresence(ctx context.Context, evt *events.Presence) error {
 	log.Printf("👁️  Presence Update: from=%s, last_seen=%v", evt.From.String(), evt.LastSeen)
+	return nil
 }
 
-func (p *EventsProcessor) handleChatPresence(ctx context.Context, evt *events.ChatPresence) {
+func (p *EventsProcessor) handleChatPresence(ctx context.Context, evt *events.ChatPresence) error {
 	log.Printf("👥 Chat Presence Update: chat=%s, participants=%v", evt.Chat.String(), evt.State)
+	return nil
 }
 
 // Conversion helpers

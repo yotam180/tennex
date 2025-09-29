@@ -21,11 +21,11 @@ import (
 type WhatsAppConnector struct {
 	storage           *db.Storage // Still needed for whatsmeow store
 	backendClient     *backendGRPC.BackendClient
-	integrationClient *backendGRPC.IntegrationClient
+	integrationClient *backendGRPC.RecordingIntegrationClient
 	eventsProcessor   *EventsProcessor
 }
 
-func NewWhatsAppConnector(storage *db.Storage, backendClient *backendGRPC.BackendClient, integrationClient *backendGRPC.IntegrationClient) *WhatsAppConnector {
+func NewWhatsAppConnector(storage *db.Storage, backendClient *backendGRPC.BackendClient, integrationClient *backendGRPC.RecordingIntegrationClient) *WhatsAppConnector {
 	return &WhatsAppConnector{
 		storage:           storage,
 		backendClient:     backendClient,
@@ -102,6 +102,11 @@ func (c *WhatsAppConnector) RunWhatsAppConnectionFlow(ctx context.Context, accou
 				fmt.Printf("👤 User ID: %s\n", accountID)
 				fmt.Printf("📱 WhatsApp JID: %s\n", jid)
 
+				// Start recording session if recording mode is enabled
+				if err := c.integrationClient.StartRecordingSession(accountID, "whatsapp"); err != nil {
+					fmt.Printf("⚠️  Failed to start recording session: %v\n", err)
+				}
+
 				// Create user integration in backend
 				userIntegrationID, err := c.integrationClient.CreateUserIntegration(
 					ctx,
@@ -143,6 +148,12 @@ func (c *WhatsAppConnector) RunWhatsAppConnectionFlow(ctx context.Context, accou
 			// Keep the client connected and handle events
 			<-ctx.Done()
 			fmt.Printf("🔄 [WA CLIENT DEBUG] Context cancelled, disconnecting WhatsApp client\n")
+
+			// End recording session before disconnecting
+			if err := c.integrationClient.EndRecordingSession(); err != nil {
+				fmt.Printf("⚠️  Failed to end recording session: %v\n", err)
+			}
+
 			client.Disconnect()
 		}
 	}()

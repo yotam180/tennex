@@ -41,10 +41,7 @@ func (s *IntegrationServer) CreateUserIntegration(ctx context.Context, req *prot
 	userID, err := uuid.Parse(req.UserId)
 	if err != nil {
 		s.logger.Error("Failed to parse user_id as UUID", zap.Error(err))
-		return &proto.CreateUserIntegrationResponse{
-			Success: false,
-			Error:   "invalid user_id format",
-		}, nil
+		return nil, fmt.Errorf("invalid user_id format: %w", err)
 	}
 
 	// Convert metadata map to JSON
@@ -52,10 +49,7 @@ func (s *IntegrationServer) CreateUserIntegration(ctx context.Context, req *prot
 	if len(req.Metadata) > 0 {
 		data, err := json.Marshal(req.Metadata)
 		if err != nil {
-			return &proto.CreateUserIntegrationResponse{
-				Success: false,
-				Error:   fmt.Sprintf("failed to marshal metadata: %v", err),
-			}, nil
+			return nil, fmt.Errorf("failed to marshal metadata: %w", err)
 		}
 		metadataJSON = data
 	}
@@ -73,10 +67,7 @@ func (s *IntegrationServer) CreateUserIntegration(ctx context.Context, req *prot
 	})
 	if err != nil {
 		s.logger.Error("Failed to create user integration", zap.Error(err))
-		return &proto.CreateUserIntegrationResponse{
-			Success: false,
-			Error:   fmt.Sprintf("database error: %v", err),
-		}, nil
+		return nil, fmt.Errorf("database error: %w", err)
 	}
 
 	return &proto.CreateUserIntegrationResponse{
@@ -94,10 +85,7 @@ func (s *IntegrationServer) UpdateConnectionStatus(ctx context.Context, req *pro
 
 	userID, err := uuid.Parse(req.Context.UserId)
 	if err != nil {
-		return &proto.UpdateConnectionStatusResponse{
-			Success: false,
-			Error:   "invalid user_id format",
-		}, nil
+		return nil, fmt.Errorf("invalid user_id format: %w", err)
 	}
 
 	// Convert proto status to string
@@ -113,10 +101,7 @@ func (s *IntegrationServer) UpdateConnectionStatus(ctx context.Context, req *pro
 	err = s.integrationService.UpdateIntegrationStatus(ctx, userID, req.Context.IntegrationType, status, lastSeen)
 	if err != nil {
 		s.logger.Error("Failed to update connection status", zap.Error(err))
-		return &proto.UpdateConnectionStatusResponse{
-			Success: false,
-			Error:   fmt.Sprintf("failed to update status: %v", err),
-		}, nil
+		return nil, fmt.Errorf("failed to update status: %w", err)
 	}
 
 	return &proto.UpdateConnectionStatusResponse{
@@ -254,10 +239,7 @@ func (s *IntegrationServer) ProcessMessage(ctx context.Context, req *proto.Proce
 	err := s.upsertMessage(ctx, req.Context, req.Message.ConversationId, req.Message)
 	if err != nil {
 		s.logger.Error("Failed to process message", zap.Error(err))
-		return &proto.ProcessMessageResponse{
-			Success: false,
-			Error:   fmt.Sprintf("failed to process message: %v", err),
-		}, nil
+		return nil, fmt.Errorf("failed to process message: %w", err)
 	}
 
 	return &proto.ProcessMessageResponse{
@@ -286,10 +268,7 @@ func (s *IntegrationServer) UpdateConversationState(ctx context.Context, req *pr
 	})
 	if err != nil {
 		s.logger.Error("Failed to update conversation state", zap.Error(err))
-		return &proto.UpdateConversationStateResponse{
-			Success: false,
-			Error:   fmt.Sprintf("failed to update conversation state: %v", err),
-		}, nil
+		return nil, fmt.Errorf("failed to update conversation state: %w", err)
 	}
 
 	return &proto.UpdateConversationStateResponse{
@@ -382,12 +361,18 @@ func (s *IntegrationServer) upsertConversationParticipant(ctx context.Context, c
 		leftAt = participant.LeftAt.AsTime()
 	}
 
+	// Default role to 'member' if not specified
+	role := participant.Role
+	if role == "" {
+		role = "member"
+	}
+
 	_, err := s.db.UpsertConversationParticipant(ctx, gen.UpsertConversationParticipantParams{
 		ConversationID:    conversationID,
 		ExternalUserID:    participant.ExternalUserId,
 		IntegrationType:   integrationCtx.IntegrationType,
 		DisplayName:       participant.DisplayName,
-		Role:              participant.Role,
+		Role:              role,
 		IsActive:          participant.IsActive,
 		JoinedAt:          joinedAt,
 		LeftAt:            leftAt,

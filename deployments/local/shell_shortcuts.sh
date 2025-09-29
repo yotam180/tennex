@@ -447,6 +447,135 @@ function txdev() {
     )
 }
 
+# Recording and Replay Commands
+
+# [txrecord] - tennex record - list all recording sessions
+function txrecord() {
+    (
+        cd ${TENNEX_HOME}
+        RECORDINGS_DIR="${TENNEX_HOME}/recordings"
+        
+        if [ ! -d "$RECORDINGS_DIR" ]; then
+            echo "📼 No recordings directory found"
+            echo "💡 Start recording by running bridge with: RECORDING_MODE=on"
+            return 0
+        fi
+        
+        echo "📼 Available Recording Sessions:"
+        echo ""
+        
+        for session_dir in "$RECORDINGS_DIR"/*; do
+            if [ -d "$session_dir" ] && [ -f "$session_dir/manifest.json" ]; then
+                session_name=$(basename "$session_dir")
+                echo "  📁 $session_name"
+                
+                # Parse and display session info
+                if command -v jq &> /dev/null; then
+                    echo "     User: $(jq -r '.user_id' "$session_dir/manifest.json")"
+                    echo "     Integration: $(jq -r '.integration_type' "$session_dir/manifest.json")"
+                    echo "     Started: $(jq -r '.started_at' "$session_dir/manifest.json" | cut -d'T' -f1,2 | tr 'T' ' ')"
+                    echo "     Recordings: $(jq -r '.total_recordings' "$session_dir/manifest.json")"
+                else
+                    grep -o '"total_recordings":[0-9]*' "$session_dir/manifest.json" | cut -d: -f2 | xargs -I {} echo "     Recordings: {}"
+                fi
+                echo ""
+            fi
+        done
+        
+        echo "💡 Use 'txreplay <session-name>' to replay a session"
+        echo "💡 Use 'txreplayshow <session-name>' to view session details"
+    )
+}
+
+# [txreplayshow] - tennex replay show - show details of a recording session
+function txreplayshow() {
+    local SESSION_NAME=$1
+    if [ -z "$SESSION_NAME" ]; then
+        echo "❌ Usage: txreplayshow <session-name>"
+        echo "💡 Run 'txrecord' to list available sessions"
+        return 1
+    fi
+    
+    (
+        cd ${TENNEX_HOME}
+        RECORDINGS_DIR="${TENNEX_HOME}/recordings"
+        SESSION_DIR="$RECORDINGS_DIR/$SESSION_NAME"
+        
+        if [ ! -d "$SESSION_DIR" ] || [ ! -f "$SESSION_DIR/manifest.json" ]; then
+            echo "❌ Session not found: $SESSION_NAME"
+            echo "💡 Run 'txrecord' to list available sessions"
+            return 1
+        fi
+        
+        if command -v jq &> /dev/null; then
+            echo "📼 Session: $SESSION_NAME"
+            echo ""
+            jq -r '"User ID: \(.user_id)\nIntegration: \(.integration_type)\nStarted: \(.started_at)\nCompleted: \(.completed_at // "In Progress")\nTotal Recordings: \(.total_recordings)"' "$SESSION_DIR/manifest.json"
+            echo ""
+            echo "Recordings:"
+            jq -r '.recordings[] | "  #\(.id | tostring | (3 - length) * " " + .)  [\(.timestamp | sub("\\.[0-9]+Z$"; "Z") | fromdate | strftime("%H:%M:%S"))] \(.request_type) \(if .metadata then "(\(.metadata | to_entries | map("\(.key)=\(.value)") | join(", ")))" else "" end)"' "$SESSION_DIR/manifest.json"
+        else
+            echo "📼 Session: $SESSION_NAME"
+            echo ""
+            cat "$SESSION_DIR/manifest.json"
+        fi
+    )
+}
+
+# [txreplay] - tennex replay - replay a recording session
+function txreplay() {
+    local SESSION_NAME=$1
+    local RANGE=${2:-""}
+    
+    if [ -z "$SESSION_NAME" ]; then
+        echo "❌ Usage: txreplay <session-name> [range]"
+        echo ""
+        echo "Examples:"
+        echo "  txreplay whatsapp-abc123-1234567890           # Replay entire session"
+        echo "  txreplay whatsapp-abc123-1234567890 5         # Replay only recording #5"
+        echo "  txreplay whatsapp-abc123-1234567890 1-10      # Replay recordings #1-10"
+        echo ""
+        echo "💡 Run 'txrecord' to list available sessions"
+        return 1
+    fi
+    
+    (
+        cd ${TENNEX_HOME}
+        RECORDINGS_DIR="${TENNEX_HOME}/recordings"
+        BACKEND_ADDR=${BACKEND_GRPC_ADDR:-"localhost:6001"}
+        
+        echo "🎬 Replaying session: $SESSION_NAME"
+        if [ -n "$RANGE" ]; then
+            echo "   Range: $RANGE"
+        fi
+        echo "   Backend: $BACKEND_ADDR"
+        echo ""
+        
+        go run services/bridge/cmd/replay/main.go \
+            --dir="$RECORDINGS_DIR" \
+            --session="$SESSION_NAME" \
+            --range="$RANGE" \
+            --backend="$BACKEND_ADDR"
+    )
+}
+
+# [txreplaydocker] - tennex replay docker - replay against backend running in Docker
+function txreplaydocker() {
+    local SESSION_NAME=$1
+    local RANGE=${2:-""}
+    
+    if [ -z "$SESSION_NAME" ]; then
+        echo "❌ Usage: txreplaydocker <session-name> [range]"
+        echo "💡 This replays against the backend container (backend:6001)"
+        return 1
+    fi
+    
+    (
+        export BACKEND_GRPC_ADDR="localhost:6001"
+        txreplay "$SESSION_NAME" "$RANGE"
+    )
+}
+
 # [txcode] - tennex code - open Cursor in the Tennex directory
 function txcode() {
     (
@@ -525,6 +654,12 @@ function txhelp() {
     echo "  txlint                 # Run linters"
     echo "  txfmt                  # Format code"
     echo "  txclean               # Clean generated files"
+    echo ""
+    echo "📼 Recording & Replay:"
+    echo "  txrecord               # List all recording sessions"
+    echo "  txreplayshow <session> # Show details of a recording session"
+    echo "  txreplay <session> [range] # Replay a recording session"
+    echo "  txreplaydocker <session> [range] # Replay against Docker backend"
     echo ""
     echo "🎵 Utilities:"
     echo "  ting                   # Play notification sound"

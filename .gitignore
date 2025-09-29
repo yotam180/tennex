@@ -70,3 +70,6 @@ coverage.out
 # Binary files built from Go stuff
 services/bridge/bridge
 services/backend/backend
+
+# Recording sessions
+recordings/
