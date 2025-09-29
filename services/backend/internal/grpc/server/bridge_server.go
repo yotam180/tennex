@@ -8,12 +8,12 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/tennex/backend/internal/core"
-	bridgev1 "github.com/tennex/pkg/proto/gen/pkg/proto"
+	proto "github.com/tennex/shared/proto/gen/proto"
 )
 
 // BridgeServer implements the bridge gRPC service
 type BridgeServer struct {
-	bridgev1.UnimplementedBridgeServiceServer
+	proto.UnimplementedBridgeServiceServer
 	eventService       *core.EventService
 	outboxService      *core.OutboxService
 	accountService     *core.AccountService
@@ -33,7 +33,7 @@ func NewBridgeServer(eventService *core.EventService, outboxService *core.Outbox
 }
 
 // UpdateAccountStatus updates account status and info via gRPC
-func (s *BridgeServer) UpdateAccountStatus(ctx context.Context, req *bridgev1.UpdateAccountStatusRequest) (*bridgev1.UpdateAccountStatusResponse, error) {
+func (s *BridgeServer) UpdateAccountStatus(ctx context.Context, req *proto.UpdateAccountStatusRequest) (*proto.UpdateAccountStatusResponse, error) {
 	s.logger.Debug("UpdateAccountStatus gRPC call received",
 		zap.String("account_id", req.AccountId),
 		zap.String("status", req.Status.String()))
@@ -78,22 +78,22 @@ func (s *BridgeServer) UpdateAccountStatus(ctx context.Context, req *bridgev1.Up
 		zap.String("wa_jid", waJid),
 		zap.String("status", status))
 
-	return &bridgev1.UpdateAccountStatusResponse{
+	return &proto.UpdateAccountStatusResponse{
 		Success: true,
 	}, nil
 }
 
 // Helper functions for protobuf conversion
 
-func convertProtoStatusToString(status bridgev1.AccountStatus) string {
+func convertProtoStatusToString(status proto.AccountStatus) string {
 	switch status {
-	case bridgev1.AccountStatus_ACCOUNT_STATUS_CONNECTED:
+	case proto.AccountStatus_ACCOUNT_STATUS_CONNECTED:
 		return "connected"
-	case bridgev1.AccountStatus_ACCOUNT_STATUS_CONNECTING:
+	case proto.AccountStatus_ACCOUNT_STATUS_CONNECTING:
 		return "connecting"
-	case bridgev1.AccountStatus_ACCOUNT_STATUS_DISCONNECTED:
+	case proto.AccountStatus_ACCOUNT_STATUS_DISCONNECTED:
 		return "disconnected"
-	case bridgev1.AccountStatus_ACCOUNT_STATUS_ERROR:
+	case proto.AccountStatus_ACCOUNT_STATUS_ERROR:
 		return "error"
 	default:
 		return "disconnected"

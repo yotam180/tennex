@@ -17,7 +17,7 @@ require (
 	github.com/oapi-codegen/runtime v1.1.2
 	github.com/tennex/shared v0.0.0
 	go.uber.org/zap v1.27.0
-	google.golang.org/grpc v1.62.1
+	google.golang.org/grpc v1.69.4
 )
 
 require github.com/google/go-cmp v0.7.0 // indirect
@@ -40,7 +40,6 @@ require (
 require (
 	github.com/fsnotify/fsnotify v1.7.0 // indirect
 	github.com/go-viper/mapstructure/v2 v2.0.0-alpha.1 // indirect
-	github.com/golang/protobuf v1.5.3 // indirect
 	github.com/jackc/pgpassfile v1.0.0 // indirect
 	github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761 // indirect
 	github.com/jackc/puddle/v2 v2.2.2 // indirect
@@ -57,8 +56,8 @@ require (
 	golang.org/x/sync v0.17.0 // indirect
 	golang.org/x/sys v0.36.0 // indirect
 	golang.org/x/text v0.29.0 // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20240123012728-ef4313101c80 // indirect
-	google.golang.org/protobuf v1.36.9 // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20241015192408-796eee8c2d53 // indirect
+	google.golang.org/protobuf v1.36.9
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 

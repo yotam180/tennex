@@ -3,10 +3,10 @@ managed:
   enabled: false
 plugins:
   - plugin: buf.build/protocolbuffers/go
-    out: shared/proto/gen
+    out: proto/gen
     opt:
       - paths=source_relative
   - plugin: buf.build/grpc/go
-    out: shared/proto/gen
+    out: proto/gen
     opt:
       - paths=source_relative

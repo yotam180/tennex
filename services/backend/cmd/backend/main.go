@@ -29,7 +29,7 @@ import (
 	"github.com/tennex/backend/internal/http/handlers"
 	"github.com/tennex/backend/internal/repo"
 	dbgen "github.com/tennex/pkg/db/gen"
-	bridgev1 "github.com/tennex/pkg/proto/gen/pkg/proto"
+	proto "github.com/tennex/shared/proto/gen/proto"
 )
 
 type Config struct {
@@ -158,7 +158,7 @@ func main() {
 			Port: config.GRPC.Port,
 			Host: config.GRPC.Host,
 		}
-		if err := runGRPCServer(ctx, grpcConfig, eventService, outboxService, accountService, integrationService, logger); err != nil {
+		if err := runGRPCServer(ctx, grpcConfig, eventService, outboxService, accountService, integrationService, queries, logger); err != nil {
 			logger.Error("gRPC server error", zap.Error(err))
 		}
 	}()
@@ -369,7 +369,7 @@ func runHTTPServer(ctx context.Context, httpConfig struct {
 func runGRPCServer(ctx context.Context, grpcConfig struct {
 	Port int
 	Host string
-}, eventService *core.EventService, outboxService *core.OutboxService, accountService *core.AccountService, integrationService *core.IntegrationService, logger *zap.Logger) error {
+}, eventService *core.EventService, outboxService *core.OutboxService, accountService *core.AccountService, integrationService *core.IntegrationService, queries *dbgen.Queries, logger *zap.Logger) error {
 
 	addr := fmt.Sprintf("%s:%d", grpcConfig.Host, grpcConfig.Port)
 	listener, err := net.Listen("tcp", addr)
@@ -379,9 +379,11 @@ func runGRPCServer(ctx context.Context, grpcConfig struct {
 
 	grpcServer := grpc.NewServer()
 	bridgeServer := server.NewBridgeServer(eventService, outboxService, accountService, integrationService, logger)
+	integrationServer := server.NewIntegrationServer(integrationService, queries, logger)
 
-	// Register the gRPC service
-	bridgev1.RegisterBridgeServiceServer(grpcServer, bridgeServer)
+	// Register the gRPC services
+	proto.RegisterBridgeServiceServer(grpcServer, bridgeServer)
+	proto.RegisterIntegrationServiceServer(grpcServer, integrationServer)
 
 	logger.Info("Starting gRPC server", zap.String("addr", addr))
 

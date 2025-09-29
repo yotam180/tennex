@@ -1,0 +1,282 @@
+syntax = "proto3";
+
+package tennex.integration.v1;
+
+option go_package = "github.com/tennex/shared/proto/gen;proto";
+
+import "google/protobuf/timestamp.proto";
+
+// Integration service handles platform-agnostic messaging integration
+service IntegrationService {
+  // Connection Management
+  rpc UpdateConnectionStatus(UpdateConnectionStatusRequest) returns (UpdateConnectionStatusResponse);
+  
+  // Bulk Synchronization (with streaming for large datasets)
+  rpc SyncConversations(stream SyncConversationsRequest) returns (SyncConversationsResponse);
+  rpc SyncContacts(stream SyncContactsRequest) returns (SyncContactsResponse); 
+  rpc SyncMessages(stream SyncMessagesRequest) returns (SyncMessagesResponse);
+  
+  // Real-time Events
+  rpc ProcessMessage(ProcessMessageRequest) returns (ProcessMessageResponse);
+  rpc UpdateConversationState(UpdateConversationStateRequest) returns (UpdateConversationStateResponse);
+  
+  // Integration Management
+  rpc CreateUserIntegration(CreateUserIntegrationRequest) returns (CreateUserIntegrationResponse);
+}
+
+// Base integration context for all requests
+message IntegrationContext {
+  string user_id = 1;           // Our system user ID
+  int32 user_integration_id = 2; // user_integrations.id 
+  string integration_type = 3;  // "whatsapp", "telegram", etc.
+  string platform_user_id = 4; // JID for WhatsApp, user_id for Telegram
+}
+
+// Connection status management
+message UpdateConnectionStatusRequest {
+  IntegrationContext context = 1;
+  ConnectionStatus status = 2;
+  string qr_code = 3;          // Optional QR code data
+  google.protobuf.Timestamp timestamp = 4;
+  map<string, string> metadata = 5; // Platform-specific data
+}
+
+message UpdateConnectionStatusResponse {
+  bool success = 1;
+  string error = 2;
+}
+
+// Conversation synchronization
+message SyncConversationsRequest {
+  IntegrationContext context = 1;
+  string sync_type = 2;        // "INITIAL_BOOTSTRAP", "RECENT", etc.
+  repeated Conversation conversations = 3;  // Batch of conversations
+  bool is_final_batch = 4;     // Indicates end of sync
+  int32 batch_number = 5;      // For progress tracking
+}
+
+message SyncConversationsResponse {
+  bool success = 1;
+  string error = 2;
+  int32 processed_count = 3;
+  int32 total_batches = 4;
+}
+
+// Contact synchronization
+message SyncContactsRequest {
+  IntegrationContext context = 1;
+  repeated Contact contacts = 2;
+  bool is_final_batch = 3;
+  int32 batch_number = 4;
+}
+
+message SyncContactsResponse {
+  bool success = 1;
+  string error = 2;
+  int32 processed_count = 3;
+}
+
+// Message synchronization
+message SyncMessagesRequest {
+  IntegrationContext context = 1;
+  string conversation_external_id = 2;
+  repeated Message messages = 3;
+  bool is_final_batch = 4;
+  int32 batch_number = 5;
+}
+
+message SyncMessagesResponse {
+  bool success = 1;
+  string error = 2;
+  int32 processed_count = 3;
+}
+
+// Real-time message processing
+message ProcessMessageRequest {
+  IntegrationContext context = 1;
+  Message message = 2;
+}
+
+message ProcessMessageResponse {
+  bool success = 1;
+  string error = 2;
+  string internal_message_id = 3; // Our UUID
+}
+
+// Conversation state updates
+message UpdateConversationStateRequest {
+  IntegrationContext context = 1;
+  string conversation_external_id = 2;
+  ConversationState state = 3;
+}
+
+message UpdateConversationStateResponse {
+  bool success = 1;
+  string error = 2;
+}
+
+// Integration creation
+message CreateUserIntegrationRequest {
+  string user_id = 1;
+  string integration_type = 2;
+  string platform_user_id = 3;
+  string display_name = 4;
+  string avatar_url = 5;
+  map<string, string> metadata = 6;
+}
+
+message CreateUserIntegrationResponse {
+  bool success = 1;
+  string error = 2;
+  int32 user_integration_id = 3;
+}
+
+// Data structures
+message Conversation {
+  string platform_id = 1;      // Chat ID in the platform
+  string name = 2;
+  ConversationType type = 3;
+  bool is_pinned = 4;
+  bool is_archived = 5;
+  bool is_muted = 6;
+  google.protobuf.Timestamp mute_until = 7;
+  bool is_read_only = 8;
+  bool is_locked = 9;
+  int32 unread_count = 10;
+  int32 unread_mention_count = 11;
+  int32 total_message_count = 12;
+  google.protobuf.Timestamp last_message_at = 13;
+  google.protobuf.Timestamp last_activity_at = 14;
+  string description = 15;
+  string avatar_url = 16;
+  map<string, string> platform_metadata = 17;  // Platform-specific data
+  repeated ConversationParticipant participants = 18;
+}
+
+message ConversationParticipant {
+  string external_user_id = 1;
+  string display_name = 2;
+  string role = 3; // member, admin, owner, moderator
+  bool is_active = 4;
+  google.protobuf.Timestamp joined_at = 5;
+  google.protobuf.Timestamp left_at = 6;
+  string added_by_external_id = 7;
+  map<string, string> platform_metadata = 8;
+}
+
+message ConversationState {
+  bool is_pinned = 1;
+  bool is_archived = 2;
+  bool is_muted = 3;
+  google.protobuf.Timestamp mute_until = 4;
+  bool is_read_only = 5;
+  bool is_locked = 6;
+  int32 unread_count = 7;
+  int32 unread_mention_count = 8;
+}
+
+message Message {
+  string platform_id = 1;         // Message ID in platform
+  string conversation_id = 2;      // Platform conversation ID
+  string sender_id = 3;            // Platform sender ID  
+  string sender_display_name = 4;
+  google.protobuf.Timestamp timestamp = 5;
+  google.protobuf.Timestamp edit_timestamp = 6;
+  MessageType message_type = 7;
+  string content = 8;              // Text content or caption
+  bool is_from_me = 9;
+  bool is_forwarded = 10;
+  bool is_deleted = 11;
+  google.protobuf.Timestamp deleted_at = 12;
+  string reply_to_external_id = 13;
+  MessageStatus status = 14;
+  map<string, string> platform_metadata = 15;
+  repeated MessageMedia media = 16; // Media attachments
+}
+
+message MessageMedia {
+  MediaType media_type = 1;
+  string file_name = 2;
+  int64 file_size = 3;
+  string mime_type = 4;
+  int32 duration_seconds = 5;     // For audio/video
+  int32 width = 6;
+  int32 height = 7;
+  string original_url = 8;
+  string thumbnail_url = 9;
+  DownloadStatus download_status = 10;
+  map<string, string> platform_metadata = 11;
+}
+
+message Contact {
+  string platform_id = 1;        // Contact's platform ID
+  string display_name = 2;
+  string first_name = 3;
+  string last_name = 4;
+  string phone_number = 5;
+  string username = 6;            // Platform username if exists
+  bool is_blocked = 7;
+  bool is_favorite = 8;
+  google.protobuf.Timestamp last_seen = 9;
+  string avatar_url = 10;
+  map<string, string> platform_metadata = 11;
+}
+
+// Enums
+enum ConnectionStatus {
+  CONNECTION_STATUS_UNSPECIFIED = 0;
+  CONNECTION_STATUS_CONNECTING = 1;
+  CONNECTION_STATUS_QR_GENERATED = 2;
+  CONNECTION_STATUS_PAIRED = 3;
+  CONNECTION_STATUS_CONNECTED = 4;
+  CONNECTION_STATUS_DISCONNECTED = 5;
+  CONNECTION_STATUS_ERROR = 6;
+}
+
+enum ConversationType {
+  CONVERSATION_TYPE_UNSPECIFIED = 0;
+  CONVERSATION_TYPE_INDIVIDUAL = 1;
+  CONVERSATION_TYPE_GROUP = 2;
+  CONVERSATION_TYPE_BROADCAST = 3;
+  CONVERSATION_TYPE_CHANNEL = 4;
+}
+
+enum MessageType {
+  MESSAGE_TYPE_UNSPECIFIED = 0;
+  MESSAGE_TYPE_TEXT = 1;
+  MESSAGE_TYPE_IMAGE = 2;
+  MESSAGE_TYPE_VIDEO = 3;
+  MESSAGE_TYPE_AUDIO = 4;
+  MESSAGE_TYPE_DOCUMENT = 5;
+  MESSAGE_TYPE_LOCATION = 6;
+  MESSAGE_TYPE_CONTACT = 7;
+  MESSAGE_TYPE_STICKER = 8;
+  MESSAGE_TYPE_POLL = 9;
+  MESSAGE_TYPE_REACTION = 10;
+  MESSAGE_TYPE_SYSTEM = 11;
+}
+
+enum MessageStatus {
+  MESSAGE_STATUS_UNSPECIFIED = 0;
+  MESSAGE_STATUS_SENT = 1;
+  MESSAGE_STATUS_DELIVERED = 2;
+  MESSAGE_STATUS_READ = 3;
+  MESSAGE_STATUS_FAILED = 4;
+}
+
+enum MediaType {
+  MEDIA_TYPE_UNSPECIFIED = 0;
+  MEDIA_TYPE_IMAGE = 1;
+  MEDIA_TYPE_VIDEO = 2;
+  MEDIA_TYPE_AUDIO = 3;
+  MEDIA_TYPE_DOCUMENT = 4;
+  MEDIA_TYPE_STICKER = 5;
+}
+
+enum DownloadStatus {
+  DOWNLOAD_STATUS_UNSPECIFIED = 0;
+  DOWNLOAD_STATUS_PENDING = 1;
+  DOWNLOAD_STATUS_DOWNLOADING = 2;
+  DOWNLOAD_STATUS_COMPLETED = 3;
+  DOWNLOAD_STATUS_FAILED = 4;
+}
