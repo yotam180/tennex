@@ -15,6 +15,7 @@ import Typography from '@mui/material/Typography';
 import { Iconify } from 'src/components/iconify';
 
 import axiosInstance, { endpoints } from 'src/lib/axios';
+import { JWT_STORAGE_KEY } from 'src/auth/context/jwt/constant';
 
 // ----------------------------------------------------------------------
 
@@ -34,8 +35,12 @@ interface SettingsResponse {
 // ----------------------------------------------------------------------
 
 async function fetchSettings(): Promise<SettingsResponse> {
-  // Get the auth token from localStorage (following the auth pattern)
-  const token = localStorage.getItem('accessToken');
+  // Get the auth token from localStorage using the correct key
+  const token = localStorage.getItem(JWT_STORAGE_KEY);
+  
+  if (!token) {
+    throw new Error('No authentication token found');
+  }
   
   const config = {
     headers: {
@@ -209,8 +214,9 @@ export function AccountIntegrations() {
                       variant="contained"
                       onClick={handleConnectWhatsApp}
                       startIcon={<Iconify icon="eva:plus-outline" />}
+                      disabled={connectingWhatsApp}
                     >
-                      Connect
+                      {connectingWhatsApp ? 'Connecting...' : 'Connect'}
                     </Button>
                   )}
                 </Box>

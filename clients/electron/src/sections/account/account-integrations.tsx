@@ -13,6 +13,7 @@ import CardHeader from '@mui/material/CardHeader';
 import CardContent from '@mui/material/CardContent';
 
 import axiosInstance, { endpoints } from 'src/lib/axios';
+import { JWT_STORAGE_KEY } from 'src/auth/context/jwt/constant';
 
 import { Iconify } from 'src/components/iconify';
 
@@ -35,8 +36,12 @@ interface SettingsResponse {
 // ----------------------------------------------------------------------
 
 async function fetchSettings(): Promise<SettingsResponse> {
-  // Get the auth token from localStorage (following the auth pattern)
-  const token = localStorage.getItem('accessToken');
+  // Get the auth token from localStorage using the correct key
+  const token = localStorage.getItem(JWT_STORAGE_KEY);
+  
+  if (!token) {
+    throw new Error('No authentication token found');
+  }
   
   const config = {
     headers: {
@@ -209,10 +214,10 @@ export function AccountIntegrations() {
                     <Button
                       variant="contained"
                       onClick={handleConnectWhatsApp}
-                      loading={connectingWhatsApp}
+                      disabled={connectingWhatsApp}
                       startIcon={<Iconify icon="eva:plus-outline" />}
                     >
-                      Connect
+                      {connectingWhatsApp ? 'Connecting...' : 'Connect'}
                     </Button>
                   )}
                 </Box>
