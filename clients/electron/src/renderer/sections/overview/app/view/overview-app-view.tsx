@@ -1,9 +1,10 @@
+import { Link } from 'react-router';
+
 import Box from '@mui/material/Box';
 import Grid from '@mui/material/Grid2';
 import Button from '@mui/material/Button';
-import Typography from '@mui/material/Typography';
-import { Link } from 'react-router';
 import { useTheme } from '@mui/material/styles';
+import Typography from '@mui/material/Typography';
 
 import { DashboardContent } from 'src/layouts/dashboard';
 import { SeoIllustration } from 'src/assets/illustrations';
@@ -30,16 +31,22 @@ export function OverviewAppView() {
   const { user } = useMockedUser();
 
   const theme = useTheme();
-  
+
   return (
     <DashboardContent maxWidth="xl">
       {/* Quick Link to WhatsApp Sync */}
       <Box sx={{ mb: 3 }}>
-        <Typography variant="body2" color="primary" component={Link} to="/dashboard/whatsapp-sync" sx={{ textDecoration: 'underline', cursor: 'pointer' }}>
+        <Typography
+          variant="body2"
+          color="primary"
+          component={Link}
+          to="/dashboard/whatsapp-sync"
+          sx={{ textDecoration: 'underline', cursor: 'pointer' }}
+        >
           → Add WhatsApp Account
         </Typography>
       </Box>
-      
+
       <Grid container spacing={3}>
         <Grid size={{ xs: 12, md: 8 }}>
           <AppWelcome

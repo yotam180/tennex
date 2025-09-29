@@ -13,10 +13,10 @@ import CardHeader from '@mui/material/CardHeader';
 import CardContent from '@mui/material/CardContent';
 
 import axiosInstance, { endpoints } from 'src/lib/axios';
-import { JWT_STORAGE_KEY } from 'src/auth/context/jwt/constant';
 
 import { Iconify } from 'src/components/iconify';
 
+import { JWT_STORAGE_KEY } from 'src/auth/context/jwt/constant';
 
 // ----------------------------------------------------------------------
 
@@ -38,11 +38,11 @@ interface SettingsResponse {
 async function fetchSettings(): Promise<SettingsResponse> {
   // Get the auth token from localStorage using the correct key
   const token = localStorage.getItem(JWT_STORAGE_KEY);
-  
+
   if (!token) {
     throw new Error('No authentication token found');
   }
-  
+
   const config = {
     headers: {
       Authorization: `Bearer ${token}`,
@@ -143,7 +143,7 @@ export function AccountIntegrations() {
   return (
     <Card>
       <CardHeader title="Integrations" subheader="Manage your external service connections" />
-      
+
       <CardContent>
         <Stack spacing={3}>
           {/* WhatsApp Integration */}
@@ -163,7 +163,7 @@ export function AccountIntegrations() {
                 >
                   <Iconify icon="logos:whatsapp-icon" width={32} sx={{ color: 'white' }} />
                 </Box>
-                
+
                 <Box sx={{ flexGrow: 1 }}>
                   <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 0.5 }}>
                     <Typography variant="h6">WhatsApp Business</Typography>
@@ -171,24 +171,25 @@ export function AccountIntegrations() {
                       size="small"
                       label={whatsappInfo?.status || 'disconnected'}
                       color={getStatusColor(whatsappInfo?.status || 'disconnected')}
-                      icon={<Iconify icon={getStatusIcon(whatsappInfo?.status || 'disconnected')} />}
+                      icon={
+                        <Iconify icon={getStatusIcon(whatsappInfo?.status || 'disconnected')} />
+                      }
                     />
                   </Stack>
-                  
+
                   <Typography variant="body2" color="text.secondary">
                     {whatsappInfo?.connected
                       ? `Connected as ${whatsappInfo.wa_jid || 'Unknown number'}`
-                      : 'Connect your WhatsApp account to send and receive messages'
-                    }
+                      : 'Connect your WhatsApp account to send and receive messages'}
                   </Typography>
-                  
+
                   {whatsappInfo?.last_seen && (
                     <Typography variant="caption" color="text.secondary">
                       Last seen: {new Date(whatsappInfo.last_seen).toLocaleString()}
                     </Typography>
                   )}
                 </Box>
-                
+
                 <Box>
                   {whatsappInfo?.connected ? (
                     <Stack spacing={1}>
@@ -242,7 +243,7 @@ export function AccountIntegrations() {
                 >
                   <Iconify icon="eva:email-outline" width={32} />
                 </Box>
-                
+
                 <Box sx={{ flexGrow: 1 }}>
                   <Typography variant="h6" color="text.secondary">
                     Email Integration
@@ -251,7 +252,7 @@ export function AccountIntegrations() {
                     Coming soon - Connect your email accounts
                   </Typography>
                 </Box>
-                
+
                 <Button disabled size="small">
                   Coming Soon
                 </Button>
