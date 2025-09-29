@@ -34,10 +34,10 @@ export const fetcher = async (args: string | [string, AxiosRequestConfig]) => {
 
 export const endpoints = {
   // Tennex Backend API endpoints
-  auth: { 
-    me: '/auth/me', 
-    signIn: '/auth/login', 
-    signUp: '/auth/register' 
+  auth: {
+    me: '/auth/me',
+    signIn: '/auth/login',
+    signUp: '/auth/register',
   },
   qr: '/qr',
   settings: '/settings',

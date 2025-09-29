@@ -26,18 +26,30 @@ services:
     image: nats:2.10-alpine
     container_name: tennex-nats
     restart: unless-stopped
-    command: [
-      "--port", "4222",
-      "--http_port", "8222",
-      "--config", "/etc/nats/nats.conf"
-    ]
+    command:
+      [
+        "--port",
+        "4222",
+        "--http_port",
+        "8222",
+        "--config",
+        "/etc/nats/nats.conf",
+      ]
     ports:
-      - "4222:4222"  # NATS port
-      - "8222:8222"  # HTTP monitoring port
+      - "4222:4222" # NATS port
+      - "8222:8222" # HTTP monitoring port
     volumes:
       - ./nats.conf:/etc/nats/nats.conf:ro
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8222/varz"]
+      test:
+        [
+          "CMD",
+          "wget",
+          "--no-verbose",
+          "--tries=1",
+          "--spider",
+          "http://localhost:8222/varz",
+        ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -54,8 +66,8 @@ services:
       MINIO_ROOT_USER: tennex
       MINIO_ROOT_PASSWORD: tennex123
     ports:
-      - "9000:9000"  # API port
-      - "9001:9001"  # Console port
+      - "9000:9000" # API port
+      - "9001:9001" # Console port
     volumes:
       - minio_data:/data
     healthcheck:
@@ -70,7 +82,7 @@ services:
   backend:
     build:
       context: ../../
-      dockerfile: services/backend/Dockerfile
+      dockerfile: services/backend/Dockerfile.dev
     container_name: tennex-backend
     restart: unless-stopped
     environment:
@@ -81,8 +93,15 @@ services:
       TENNEX_AUTH_JWT_SECRET: dev-jwt-secret-change-in-production
       TENNEX_LOG_LEVEL: debug
     ports:
-      - "8000:8000"  # HTTP API
-      - "6001:6001"  # gRPC
+      - "8000:8000" # HTTP API
+      - "6001:6001" # gRPC
+    volumes:
+      # Mount source code for hot reloading
+      - ../../services/backend:/app/services/backend
+      - ../../shared:/app/shared
+      - ../../pkg:/app/pkg
+      # Cache go modules to avoid re-downloading
+      - backend_go_cache:/go/pkg/mod
     depends_on:
       postgres:
         condition: service_healthy
@@ -105,7 +124,7 @@ services:
       TENNEX_BACKEND_URL: http://backend:8000
       TENNEX_LOG_LEVEL: debug
     ports:
-      - "6002:6002"  # WebSocket API
+      - "6002:6002" # WebSocket API
     depends_on:
       - backend
       - nats
@@ -124,15 +143,17 @@ services:
       TENNEX_HTTP_PORT: 6003
       TENNEX_DATABASE_URL: postgres://tennex:tennex123@postgres:5432/tennex?sslmode=disable
       TENNEX_BACKEND_URL: http://backend:8000
+      BACKEND_GRPC_ADDR: backend:6001
       JWT_SECRET: dev-jwt-secret-change-in-production
       TENNEX_LOG_LEVEL: debug
       CGO_ENABLED: 0
     ports:
-      - "6003:6003"  # Bridge API
+      - "6003:6003" # Bridge API
     volumes:
       # Mount source code for hot reloading
       - ../../services/bridge:/app/services/bridge
       - ../../shared:/app/shared
+      - ../../pkg:/app/pkg
       # Cache go modules to avoid re-downloading
       - bridge_go_cache:/go/pkg/mod
     depends_on:
@@ -149,7 +170,7 @@ services:
     environment:
       PGADMIN_DEFAULT_EMAIL: admin@tennex.com
       PGADMIN_DEFAULT_PASSWORD: admin123
-      PGADMIN_CONFIG_SERVER_MODE: 'False'
+      PGADMIN_CONFIG_SERVER_MODE: "False"
     ports:
       - "8080:80"
     volumes:
@@ -167,6 +188,8 @@ volumes:
   pgadmin_data:
     driver: local
   minio_data:
+    driver: local
+  backend_go_cache:
     driver: local
   bridge_go_cache:
     driver: local
