@@ -21,13 +21,15 @@ type WhatsAppHandler struct {
 	storage           *db.Storage
 	whatsappConnector *whatsapp.WhatsAppConnector
 	backendClient     *backendGRPC.BackendClient
+	integrationClient *backendGRPC.IntegrationClient
 }
 
-func NewWhatsAppHandler(storage *db.Storage, whatsappConnector *whatsapp.WhatsAppConnector, backendClient *backendGRPC.BackendClient) *WhatsAppHandler {
+func NewWhatsAppHandler(storage *db.Storage, whatsappConnector *whatsapp.WhatsAppConnector, backendClient *backendGRPC.BackendClient, integrationClient *backendGRPC.IntegrationClient) *WhatsAppHandler {
 	return &WhatsAppHandler{
 		storage:           storage,
 		whatsappConnector: whatsappConnector,
 		backendClient:     backendClient,
+		integrationClient: integrationClient,
 	}
 }
 

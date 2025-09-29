@@ -9,12 +9,12 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
-	bridgev1 "github.com/tennex/pkg/proto/gen/pkg/proto"
+	proto "github.com/tennex/shared/proto/gen/proto"
 )
 
 // BackendClient wraps the gRPC client for communicating with the backend
 type BackendClient struct {
-	client bridgev1.BridgeServiceClient
+	client proto.BridgeServiceClient
 	conn   *grpc.ClientConn
 }
 
@@ -25,7 +25,7 @@ func NewBackendClient(backendAddr string) (*BackendClient, error) {
 		return nil, fmt.Errorf("failed to connect to backend at %s: %w", backendAddr, err)
 	}
 
-	client := bridgev1.NewBridgeServiceClient(conn)
+	client := proto.NewBridgeServiceClient(conn)
 
 	return &BackendClient{
 		client: client,
@@ -43,11 +43,11 @@ func (c *BackendClient) Close() error {
 
 // UpdateAccountStatus updates the account status in the backend
 func (c *BackendClient) UpdateAccountStatus(ctx context.Context, accountID, waJid, displayName, avatarUrl string) error {
-	req := &bridgev1.UpdateAccountStatusRequest{
+	req := &proto.UpdateAccountStatusRequest{
 		AccountId: accountID,
-		Status:    bridgev1.AccountStatus_ACCOUNT_STATUS_CONNECTED,
+		Status:    proto.AccountStatus_ACCOUNT_STATUS_CONNECTED,
 		LastSeen:  timestamppb.New(time.Now()),
-		Info: &bridgev1.AccountInfo{
+		Info: &proto.AccountInfo{
 			WaJid:       waJid,
 			DisplayName: displayName,
 			AvatarUrl:   avatarUrl,
@@ -68,9 +68,9 @@ func (c *BackendClient) UpdateAccountStatus(ctx context.Context, accountID, waJi
 
 // UpdateAccountDisconnected updates the account status to disconnected
 func (c *BackendClient) UpdateAccountDisconnected(ctx context.Context, accountID string) error {
-	req := &bridgev1.UpdateAccountStatusRequest{
+	req := &proto.UpdateAccountStatusRequest{
 		AccountId: accountID,
-		Status:    bridgev1.AccountStatus_ACCOUNT_STATUS_DISCONNECTED,
+		Status:    proto.AccountStatus_ACCOUNT_STATUS_DISCONNECTED,
 		LastSeen:  timestamppb.New(time.Now()),
 	}
 

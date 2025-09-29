@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"reflect"
 
 	"github.com/mdp/qrterminal/v3"
 	"github.com/tennex/bridge/db"
@@ -13,7 +12,6 @@ import (
 	"go.mau.fi/whatsmeow/proto/waCompanionReg"
 	"go.mau.fi/whatsmeow/store"
 	"go.mau.fi/whatsmeow/store/sqlstore"
-	"go.mau.fi/whatsmeow/types/events"
 	waLog "go.mau.fi/whatsmeow/util/log"
 	"google.golang.org/protobuf/proto"
 
@@ -21,14 +19,17 @@ import (
 )
 
 type WhatsAppConnector struct {
-	storage       *db.Storage // Still needed for whatsmeow store
-	backendClient *backendGRPC.BackendClient
+	storage           *db.Storage // Still needed for whatsmeow store
+	backendClient     *backendGRPC.BackendClient
+	integrationClient *backendGRPC.IntegrationClient
+	eventsProcessor   *EventsProcessor
 }
 
-func NewWhatsAppConnector(storage *db.Storage, backendClient *backendGRPC.BackendClient) *WhatsAppConnector {
+func NewWhatsAppConnector(storage *db.Storage, backendClient *backendGRPC.BackendClient, integrationClient *backendGRPC.IntegrationClient) *WhatsAppConnector {
 	return &WhatsAppConnector{
-		storage:       storage,
-		backendClient: backendClient,
+		storage:           storage,
+		backendClient:     backendClient,
+		integrationClient: integrationClient,
 	}
 }
 
@@ -36,6 +37,9 @@ type QRCodeData string
 
 func (c *WhatsAppConnector) RunWhatsAppConnectionFlow(ctx context.Context, accountID string, callbackChan chan<- QRCodeData) error {
 	fmt.Println("Starting WhatsApp connection flow...")
+
+	// Create events processor for this connection
+	c.eventsProcessor = NewEventsProcessor(c.integrationClient, c.backendClient, accountID)
 
 	dsn := db.GetConnectionString()
 	dbLogger := waLog.Stdout("whatsapp", "DEBUG", true)
@@ -52,7 +56,10 @@ func (c *WhatsAppConnector) RunWhatsAppConnectionFlow(ctx context.Context, accou
 	device := container.NewDevice()
 	client := whatsmeow.NewClient(device, dbLogger)
 
-	client.AddEventHandler(eventHandler)
+	// Use the events processor instead of the generic event handler
+	client.AddEventHandler(func(evt interface{}) {
+		c.eventsProcessor.ProcessEvent(ctx, evt)
+	})
 
 	qrChan, err := client.GetQRChannel(ctx)
 	if err != nil {
@@ -84,15 +91,41 @@ func (c *WhatsAppConnector) RunWhatsAppConnectionFlow(ctx context.Context, accou
 
 			case "success":
 				jid := ""
+				displayName := ""
+				avatarURL := ""
+
 				if client.Store != nil && client.Store.ID != nil {
 					jid = client.Store.ID.String()
 				}
+
 				fmt.Printf("\n🎉 QR scan successful! Session established.\n")
 				fmt.Printf("👤 User ID: %s\n", accountID)
 				fmt.Printf("📱 WhatsApp JID: %s\n", jid)
 
-				// Notify backend about the WhatsApp connection via gRPC
-				if err := c.backendClient.UpdateAccountStatus(ctx, accountID, jid, "", ""); err != nil {
+				// Create user integration in backend
+				userIntegrationID, err := c.integrationClient.CreateUserIntegration(
+					ctx,
+					accountID,
+					jid,
+					displayName,
+					avatarURL,
+					map[string]string{
+						"device_id":     device.ID.String(),
+						"platform_type": "desktop",
+					},
+				)
+				if err != nil {
+					fmt.Printf("❌ Failed to create user integration: %v\n", err)
+					// Continue anyway - don't fail the entire flow for this
+				} else {
+					fmt.Printf("✅ User integration created: ID=%d\n", userIntegrationID)
+
+					// Set integration context in events processor
+					c.eventsProcessor.SetIntegrationContext(userIntegrationID, jid)
+				}
+
+				// Also notify backend about connection via old bridge service (for compatibility)
+				if err := c.backendClient.UpdateAccountStatus(ctx, accountID, jid, displayName, avatarURL); err != nil {
 					fmt.Printf("❌ Failed to notify backend of WhatsApp connection: %v\n", err)
 					// Continue anyway - don't fail the entire flow for this
 				} else {
@@ -115,56 +148,4 @@ func (c *WhatsAppConnector) RunWhatsAppConnectionFlow(ctx context.Context, accou
 	}()
 
 	return nil
-}
-
-func eventHandler(evt interface{}) {
-	// Get event type name
-	eventType := reflect.TypeOf(evt).String()
-
-	// Print basic event info
-	fmt.Printf("\n🔔 Event received: %s\n", eventType)
-
-	// Handle specific event types
-	switch v := evt.(type) {
-	case *events.Message:
-		msgID := "unknown"
-		if v.Info.ID != "" {
-			msgID = v.Info.ID
-		}
-		conversation := v.Message.GetConversation()
-		sender := v.Info.Sender.String()
-
-		fmt.Printf("📨 Message ID: %s\n", msgID)
-		fmt.Printf("👤 From: %s\n", sender)
-		fmt.Printf("💬 Content: %s\n", conversation)
-
-	case *events.Receipt:
-		fmt.Printf("✅ Receipt: %s for message %s\n", v.Type, v.MessageIDs)
-
-	case *events.Presence:
-		fmt.Printf("👁️  Presence: %s is %s\n", v.From.String(), v.LastSeen.String())
-
-	case *events.ChatPresence:
-		fmt.Printf("👥 Chat presence: %s in %s\n", v.State, v.Chat.String())
-
-	case *events.HistorySync:
-		fmt.Printf("🔄 History sync: %s (%d conversations)\n", v.Data.SyncType, len(v.Data.Conversations))
-
-	case *events.AppStateSyncComplete:
-		fmt.Printf("🔄 App state sync complete: %s\n", v.Name)
-
-	case *events.Connected:
-		fmt.Printf("🔗 Connected to WhatsApp!\n")
-
-	case *events.Disconnected:
-		fmt.Printf("❌ Disconnected from WhatsApp\n")
-
-	case *events.LoggedOut:
-		fmt.Printf("👋 Logged out from WhatsApp\n")
-
-	default:
-		fmt.Printf("❓ Unknown event type: %s\n", eventType)
-	}
-
-	fmt.Printf("───────────────────────────────────────\n")
 }

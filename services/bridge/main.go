@@ -97,12 +97,21 @@ func main() {
 	defer backendClient.Close()
 	slog.Info("✅ Backend gRPC client connected", "addr", backendAddr)
 
-	// Initialize WhatsApp connector with backend client
-	whatsappConnector = whatsapp.NewWhatsAppConnector(storage, backendClient)
+	// Initialize integration gRPC client
+	integrationClient, err := backendGRPC.NewIntegrationClient(backendAddr)
+	if err != nil {
+		slog.Error("Failed to initialize integration gRPC client", "error", err, "addr", backendAddr)
+		os.Exit(1)
+	}
+	defer integrationClient.Close()
+	slog.Info("✅ Integration gRPC client connected", "addr", backendAddr)
+
+	// Initialize WhatsApp connector with both clients
+	whatsappConnector = whatsapp.NewWhatsAppConnector(storage, backendClient, integrationClient)
 	slog.Info("✅ WhatsApp connector initialized")
 
 	// Initialize handlers
-	whatsappHandler := handlers.NewWhatsAppHandler(storage, whatsappConnector, backendClient)
+	whatsappHandler := handlers.NewWhatsAppHandler(storage, whatsappConnector, backendClient, integrationClient)
 	mainHandler := handlers.NewMainHandler(storage, whatsappHandler, jwtConfig)
 
 	// Setup HTTP router
