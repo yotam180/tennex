@@ -18,20 +18,20 @@ INSERT INTO message_media (
         platform_metadata
     )
 VALUES (
-        $1::uuid,
-        $2::text,
-        $3::text,
-        $4::bigint,
-        $5::text,
-        $6::int,
-        $7::int,
-        $8::int,
-        $9::text,
-        $10::text,
-        $11::text,
-        $12::text,
-        $13::timestamptz,
-        $14::jsonb
+        @message_id::uuid,
+        @media_type::text,
+        @file_name::text,
+        @file_size::bigint,
+        @mime_type::text,
+        @duration_seconds::int,
+        @width::int,
+        @height::int,
+        @original_url::text,
+        @thumbnail_url::text,
+        @local_file_path::text,
+        @download_status::text,
+        @downloaded_at::timestamptz,
+        @platform_metadata::jsonb
     )
 RETURNING id,
     message_id,

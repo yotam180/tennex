@@ -2,7 +2,6 @@ package server
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -272,9 +271,9 @@ func (s *IntegrationServer) UpdateConversationState(ctx context.Context, req *pr
 		zap.String("conversation_id", req.ConversationExternalId),
 		zap.Bool("is_pinned", req.State.IsPinned))
 
-	var muteUntil sql.NullTime
+	var muteUntil time.Time
 	if req.State.MuteUntil != nil {
-		muteUntil = sql.NullTime{Time: req.State.MuteUntil.AsTime(), Valid: true}
+		muteUntil = req.State.MuteUntil.AsTime()
 	}
 
 	err := s.db.UpdateConversationState(ctx, gen.UpdateConversationStateParams{
@@ -312,17 +311,17 @@ func (s *IntegrationServer) upsertConversation(ctx context.Context, integrationC
 	}
 
 	// Convert timestamps
-	var lastMessageAt, lastActivityAt sql.NullTime
+	var lastMessageAt, lastActivityAt time.Time
 	if conv.LastMessageAt != nil {
-		lastMessageAt = sql.NullTime{Time: conv.LastMessageAt.AsTime(), Valid: true}
+		lastMessageAt = conv.LastMessageAt.AsTime()
 	}
 	if conv.LastActivityAt != nil {
-		lastActivityAt = sql.NullTime{Time: conv.LastActivityAt.AsTime(), Valid: true}
+		lastActivityAt = conv.LastActivityAt.AsTime()
 	}
 
-	var muteUntil sql.NullTime
+	var muteUntil time.Time
 	if conv.MuteUntil != nil {
-		muteUntil = sql.NullTime{Time: conv.MuteUntil.AsTime(), Valid: true}
+		muteUntil = conv.MuteUntil.AsTime()
 	}
 
 	// Upsert conversation
@@ -331,9 +330,9 @@ func (s *IntegrationServer) upsertConversation(ctx context.Context, integrationC
 		ExternalConversationID: conv.PlatformId,
 		IntegrationType:        integrationCtx.IntegrationType,
 		ConversationType:       convertProtoConversationType(conv.Type),
-		Name:                   sql.NullString{String: conv.Name, Valid: conv.Name != ""},
-		Description:            sql.NullString{String: conv.Description, Valid: conv.Description != ""},
-		AvatarUrl:              sql.NullString{String: conv.AvatarUrl, Valid: conv.AvatarUrl != ""},
+		Name:                   conv.Name,
+		Description:            conv.Description,
+		AvatarUrl:              conv.AvatarUrl,
 		IsArchived:             conv.IsArchived,
 		IsPinned:               conv.IsPinned,
 		IsMuted:                conv.IsMuted,
@@ -375,24 +374,24 @@ func (s *IntegrationServer) upsertConversationParticipant(ctx context.Context, c
 		platformMetadata = data
 	}
 
-	var joinedAt, leftAt sql.NullTime
+	var joinedAt, leftAt time.Time
 	if participant.JoinedAt != nil {
-		joinedAt = sql.NullTime{Time: participant.JoinedAt.AsTime(), Valid: true}
+		joinedAt = participant.JoinedAt.AsTime()
 	}
 	if participant.LeftAt != nil {
-		leftAt = sql.NullTime{Time: participant.LeftAt.AsTime(), Valid: true}
+		leftAt = participant.LeftAt.AsTime()
 	}
 
 	_, err := s.db.UpsertConversationParticipant(ctx, gen.UpsertConversationParticipantParams{
 		ConversationID:    conversationID,
 		ExternalUserID:    participant.ExternalUserId,
 		IntegrationType:   integrationCtx.IntegrationType,
-		DisplayName:       sql.NullString{String: participant.DisplayName, Valid: participant.DisplayName != ""},
+		DisplayName:       participant.DisplayName,
 		Role:              participant.Role,
 		IsActive:          participant.IsActive,
 		JoinedAt:          joinedAt,
 		LeftAt:            leftAt,
-		AddedByExternalID: sql.NullString{String: participant.AddedByExternalId, Valid: participant.AddedByExternalId != ""},
+		AddedByExternalID: participant.AddedByExternalId,
 		PlatformMetadata:  platformMetadata,
 	})
 	return err
@@ -408,24 +407,24 @@ func (s *IntegrationServer) upsertContact(ctx context.Context, integrationCtx *p
 		platformMetadata = data
 	}
 
-	var lastSeen sql.NullTime
+	var lastSeen time.Time
 	if contact.LastSeen != nil {
-		lastSeen = sql.NullTime{Time: contact.LastSeen.AsTime(), Valid: true}
+		lastSeen = contact.LastSeen.AsTime()
 	}
 
 	_, err := s.db.UpsertContact(ctx, gen.UpsertContactParams{
 		UserIntegrationID: integrationCtx.UserIntegrationId,
 		ExternalContactID: contact.PlatformId,
 		IntegrationType:   integrationCtx.IntegrationType,
-		DisplayName:       sql.NullString{String: contact.DisplayName, Valid: contact.DisplayName != ""},
-		FirstName:         sql.NullString{String: contact.FirstName, Valid: contact.FirstName != ""},
-		LastName:          sql.NullString{String: contact.LastName, Valid: contact.LastName != ""},
-		PhoneNumber:       sql.NullString{String: contact.PhoneNumber, Valid: contact.PhoneNumber != ""},
-		Username:          sql.NullString{String: contact.Username, Valid: contact.Username != ""},
+		DisplayName:       contact.DisplayName,
+		FirstName:         contact.FirstName,
+		LastName:          contact.LastName,
+		PhoneNumber:       contact.PhoneNumber,
+		Username:          contact.Username,
 		IsBlocked:         contact.IsBlocked,
 		IsFavorite:        contact.IsFavorite,
 		LastSeen:          lastSeen,
-		AvatarUrl:         sql.NullString{String: contact.AvatarUrl, Valid: contact.AvatarUrl != ""},
+		AvatarUrl:         contact.AvatarUrl,
 		PlatformMetadata:  platformMetadata,
 	})
 	return err
@@ -452,32 +451,32 @@ func (s *IntegrationServer) upsertMessage(ctx context.Context, integrationCtx *p
 	}
 
 	// Convert timestamps
-	var editTimestamp, deletedAt sql.NullTime
+	var editTimestamp, deletedAt time.Time
 	if message.EditTimestamp != nil {
-		editTimestamp = sql.NullTime{Time: message.EditTimestamp.AsTime(), Valid: true}
+		editTimestamp = message.EditTimestamp.AsTime()
 	}
 	if message.DeletedAt != nil {
-		deletedAt = sql.NullTime{Time: message.DeletedAt.AsTime(), Valid: true}
+		deletedAt = message.DeletedAt.AsTime()
 	}
 
 	// Upsert message
 	msg, err := s.db.UpsertMessage(ctx, gen.UpsertMessageParams{
 		ConversationID:    conversation.ID,
 		ExternalMessageID: message.PlatformId,
-		ExternalServerID:  sql.NullString{String: "", Valid: false}, // Not used in this context
+		ExternalServerID:  "", // Not used in this context
 		IntegrationType:   integrationCtx.IntegrationType,
 		SenderExternalID:  message.SenderId,
-		SenderDisplayName: sql.NullString{String: message.SenderDisplayName, Valid: message.SenderDisplayName != ""},
+		SenderDisplayName: message.SenderDisplayName,
 		MessageType:       convertProtoMessageType(message.MessageType),
-		Content:           sql.NullString{String: message.Content, Valid: message.Content != ""},
+		Content:           message.Content,
 		Timestamp:         message.Timestamp.AsTime(),
 		EditTimestamp:     editTimestamp,
 		IsFromMe:          message.IsFromMe,
 		IsForwarded:       message.IsForwarded,
 		IsDeleted:         message.IsDeleted,
 		DeletedAt:         deletedAt,
-		ReplyToMessageID:  uuid.NullUUID{Valid: false}, // Will implement reply lookup if needed
-		ReplyToExternalID: sql.NullString{String: message.ReplyToExternalId, Valid: message.ReplyToExternalId != ""},
+		ReplyToMessageID:  uuid.Nil, // Will implement reply lookup if needed
+		ReplyToExternalID: message.ReplyToExternalId,
 		DeliveryStatus:    convertProtoMessageStatus(message.Status),
 		PlatformMetadata:  platformMetadata,
 	})
@@ -511,17 +510,17 @@ func (s *IntegrationServer) upsertMessageMedia(ctx context.Context, messageID uu
 	_, err := s.db.CreateMessageMedia(ctx, gen.CreateMessageMediaParams{
 		MessageID:        messageID,
 		MediaType:        convertProtoMediaType(media.MediaType),
-		FileName:         sql.NullString{String: media.FileName, Valid: media.FileName != ""},
-		FileSize:         sql.NullInt64{Int64: media.FileSize, Valid: media.FileSize > 0},
-		MimeType:         sql.NullString{String: media.MimeType, Valid: media.MimeType != ""},
-		DurationSeconds:  sql.NullInt32{Int32: media.DurationSeconds, Valid: media.DurationSeconds > 0},
-		Width:            sql.NullInt32{Int32: media.Width, Valid: media.Width > 0},
-		Height:           sql.NullInt32{Int32: media.Height, Valid: media.Height > 0},
-		OriginalUrl:      sql.NullString{String: media.OriginalUrl, Valid: media.OriginalUrl != ""},
-		ThumbnailUrl:     sql.NullString{String: media.ThumbnailUrl, Valid: media.ThumbnailUrl != ""},
-		LocalFilePath:    sql.NullString{String: "", Valid: false},
+		FileName:         media.FileName,
+		FileSize:         media.FileSize,
+		MimeType:         media.MimeType,
+		DurationSeconds:  media.DurationSeconds,
+		Width:            media.Width,
+		Height:           media.Height,
+		OriginalUrl:      media.OriginalUrl,
+		ThumbnailUrl:     media.ThumbnailUrl,
+		LocalFilePath:    "",
 		DownloadStatus:   convertProtoDownloadStatus(media.DownloadStatus),
-		DownloadedAt:     sql.NullTime{Valid: false},
+		DownloadedAt:     time.Time{}, // Zero time value
 		PlatformMetadata: platformMetadata,
 	})
 	return err

@@ -17,19 +17,19 @@ INSERT INTO contacts (
         platform_metadata
     )
 VALUES (
-        $1::int,
-        $2::text,
-        $3::text,
-        $4::text,
-        $5::text,
-        $6::text,
-        $7::text,
-        $8::text,
-        $9::bool,
-        $10::bool,
-        $11::timestamptz,
-        $12::text,
-        $13::jsonb
+        @user_integration_id::int,
+        @external_contact_id::text,
+        @integration_type::text,
+        @display_name::text,
+        @first_name::text,
+        @last_name::text,
+        @phone_number::text,
+        @username::text,
+        @is_blocked::bool,
+        @is_favorite::bool,
+        @last_seen::timestamptz,
+        @avatar_url::text,
+        @platform_metadata::jsonb
     ) ON CONFLICT (user_integration_id, external_contact_id) DO
 UPDATE
 SET display_name = EXCLUDED.display_name,

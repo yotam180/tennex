@@ -22,24 +22,24 @@ INSERT INTO messages (
         platform_metadata
     )
 VALUES (
-        $1::uuid,
-        $2::text,
-        $3::text,
-        $4::text,
-        $5::text,
-        $6::text,
-        $7::text,
-        $8::text,
-        $9::timestamptz,
-        $10::timestamptz,
-        $11::bool,
-        $12::bool,
-        $13::bool,
-        $14::timestamptz,
-        $15::uuid,
-        $16::text,
-        $17::text,
-        $18::jsonb
+        @conversation_id::uuid,
+        @external_message_id::text,
+        @external_server_id::text,
+        @integration_type::text,
+        @sender_external_id::text,
+        @sender_display_name::text,
+        @message_type::text,
+        @content::text,
+        @timestamp::timestamptz,
+        @edit_timestamp::timestamptz,
+        @is_from_me::bool,
+        @is_forwarded::bool,
+        @is_deleted::bool,
+        @deleted_at::timestamptz,
+        @reply_to_message_id::uuid,
+        @reply_to_external_id::text,
+        @delivery_status::text,
+        @platform_metadata::jsonb
     ) ON CONFLICT (conversation_id, external_message_id) DO
 UPDATE
 SET external_server_id = EXCLUDED.external_server_id,

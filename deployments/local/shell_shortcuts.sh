@@ -23,11 +23,36 @@ function txrss() {
     source ${TENNEX_HOME}/local/shell_shortcuts.sh
 }
 
+# [txsqlc] - tennex sqlc - generate sqlc code and clean up duplicate imports
+function txsqlc() {
+    (
+        cd ${TENNEX_HOME}
+        echo "🔧 Generating sqlc code..."
+        if [ -f "pkg/db/sqlc.yaml" ] && [ -d "pkg/db/queries" ]; then
+            sqlc generate -f pkg/db/sqlc.yaml
+            echo "🧹 Cleaning up duplicate JSON imports..."
+            find pkg/db/gen -name "*.go" -exec sed -i '' '/^[[:space:]]*"json"[[:space:]]*$/d' {} \;
+            echo "✅ sqlc generation and cleanup complete"
+        else
+            echo "⚠️  Skipping sqlc generation (sqlc.yaml or queries not found)"
+            return 1
+        fi
+    )
+}
+
 # [txgen] - tennex generate - generate code from contracts (OpenAPI, protobuf, sqlc)
 function txgen() {
     (
         cd ${TENNEX_HOME}
         echo "🔄 Generating code from contracts..."
+        
+        echo "🔧 Generating protobuf code..."
+        if [ -f "shared/buf.yaml" ] && [ -d "shared/proto" ]; then
+            (cd shared && buf generate)
+            echo "✅ Protobuf generation complete"
+        else
+            echo "⚠️  Skipping protobuf generation (shared/buf.yaml or shared/proto not found)"
+        fi
         
         echo "🔧 Generating OpenAPI code for backend..."
         if [ -f "pkg/api/openapi.yaml" ]; then
@@ -46,12 +71,7 @@ function txgen() {
         fi
         
         echo "🔧 Generating sqlc code..."
-        if [ -f "pkg/db/sqlc.yaml" ] && [ -d "pkg/db/queries" ]; then
-            sqlc generate -f pkg/db/sqlc.yaml
-            echo "✅ sqlc generation complete"
-        else
-            echo "⚠️  Skipping sqlc generation (sqlc.yaml or queries not found)"
-        fi
+        txsqlc
         
         echo "🎉 Code generation complete!"
     )
@@ -460,7 +480,8 @@ function txhelp() {
     echo "  txcode                  # Open Cursor editor"
     echo ""
     echo "🔄 Code Generation:"
-    echo "  txgen                   # Generate code from contracts"
+    echo "  txgen                   # Generate code from contracts (protobuf, OpenAPI, sqlc)"
+    echo "  txsqlc                  # Generate sqlc code and clean up imports"
     echo "  txrss                   # Refresh shell shortcuts"
     echo ""
     echo "📊 Database:"

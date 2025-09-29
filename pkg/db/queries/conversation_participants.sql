@@ -14,16 +14,16 @@ INSERT INTO conversation_participants (
         platform_metadata
     )
 VALUES (
-        $1::uuid,
-        $2::text,
-        $3::text,
-        $4::text,
-        $5::text,
-        $6::bool,
-        $7::timestamptz,
-        $8::timestamptz,
-        $9::text,
-        $10::jsonb
+        @conversation_id::uuid,
+        @external_user_id::text,
+        @integration_type::text,
+        @display_name::text,
+        @role::text,
+        @is_active::bool,
+        @joined_at::timestamptz,
+        @left_at::timestamptz,
+        @added_by_external_id::text,
+        @platform_metadata::jsonb
     ) ON CONFLICT (conversation_id, external_user_id) DO
 UPDATE
 SET display_name = EXCLUDED.display_name,
