@@ -66,3 +66,7 @@ coverage.out
 # Build artifacts
 *.tar.gz
 *.zip
+
+# Binary files built from Go stuff
+services/bridge/bridge
+# services/backend/backend
