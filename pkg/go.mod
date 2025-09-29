@@ -10,6 +10,8 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/jackc/pgx/v5 v5.6.0
 	github.com/oapi-codegen/runtime v1.1.2
+	google.golang.org/grpc v1.69.4
+	google.golang.org/protobuf v1.36.9
 )
 
 require (

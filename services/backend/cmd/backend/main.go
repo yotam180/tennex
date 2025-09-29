@@ -29,6 +29,7 @@ import (
 	"github.com/tennex/backend/internal/http/handlers"
 	"github.com/tennex/backend/internal/repo"
 	dbgen "github.com/tennex/pkg/db/gen"
+	bridgev1 "github.com/tennex/pkg/proto/gen/pkg/proto"
 )
 
 type Config struct {
@@ -375,10 +376,10 @@ func runGRPCServer(ctx context.Context, grpcConfig struct {
 	}
 
 	grpcServer := grpc.NewServer()
-	_ = server.NewBridgeServer(eventService, outboxService, accountService, logger)
+	bridgeServer := server.NewBridgeServer(eventService, outboxService, accountService, logger)
 
-	// Register service (TODO: replace with generated registration)
-	// bridgev1.RegisterBridgeServiceServer(grpcServer, bridgeServer)
+	// Register the gRPC service
+	bridgev1.RegisterBridgeServiceServer(grpcServer, bridgeServer)
 
 	logger.Info("Starting gRPC server", zap.String("addr", addr))
 

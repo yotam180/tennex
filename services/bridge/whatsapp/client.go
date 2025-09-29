@@ -8,6 +8,7 @@ import (
 
 	"github.com/mdp/qrterminal/v3"
 	"github.com/tennex/bridge/db"
+	backendGRPC "github.com/tennex/bridge/internal/grpc"
 	"go.mau.fi/whatsmeow"
 	"go.mau.fi/whatsmeow/proto/waCompanionReg"
 	"go.mau.fi/whatsmeow/store"
@@ -20,11 +21,15 @@ import (
 )
 
 type WhatsAppConnector struct {
-	storage *db.Storage
+	storage       *db.Storage // Still needed for whatsmeow store
+	backendClient *backendGRPC.BackendClient
 }
 
-func NewWhatsAppConnector(storage *db.Storage) *WhatsAppConnector {
-	return &WhatsAppConnector{storage: storage}
+func NewWhatsAppConnector(storage *db.Storage, backendClient *backendGRPC.BackendClient) *WhatsAppConnector {
+	return &WhatsAppConnector{
+		storage:       storage,
+		backendClient: backendClient,
+	}
 }
 
 type QRCodeData string
@@ -86,12 +91,13 @@ func (c *WhatsAppConnector) RunWhatsAppConnectionFlow(ctx context.Context, accou
 				fmt.Printf("👤 User ID: %s\n", accountID)
 				fmt.Printf("📱 WhatsApp JID: %s\n", jid)
 
-				if err := c.storage.SetJIDForAccount(ctx, accountID, jid); err != nil {
-					fmt.Printf("❌ Failed to set JID for account: %v\n", err)
-					return
+				// Notify backend about the WhatsApp connection via gRPC
+				if err := c.backendClient.UpdateAccountStatus(ctx, accountID, jid, "", ""); err != nil {
+					fmt.Printf("❌ Failed to notify backend of WhatsApp connection: %v\n", err)
+					// Continue anyway - don't fail the entire flow for this
+				} else {
+					fmt.Printf("✅ Backend notified of WhatsApp connection!\n")
 				}
-
-				fmt.Printf("✅ Connection saved successfully!\n")
 				qrHandled = true
 			}
 		}

@@ -67,33 +67,17 @@ func (h *MainHandler) ListConnections(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	userIDStr := userID.String()
-
-	// Get all connections for this user
-	connections, err := h.storage.GetAccountConnections(r.Context(), userIDStr)
-	if err != nil {
-		h.writeError(w, http.StatusInternalServerError, "database_error", "Failed to retrieve connections", nil)
-		return
-	}
-
-	// Convert to API format
+	// For now, just return WhatsApp connection info
+	// In the future, this could call the backend to get full connection details
 	var apiConnections []api.Connection
-	for _, conn := range connections {
-		connected := conn.Identifier != ""
 
-		apiConn := api.Connection{
-			Platform:  getPlatformFromIntegrationID(conn.IntegrationID),
-			Connected: connected,
-			UserId:    userID,
-		}
-
-		if connected {
-			apiConn.PlatformUserId = &conn.Identifier
-			// TODO: Add display_name, avatar_url, connected_at, last_seen when available
-		}
-
-		apiConnections = append(apiConnections, apiConn)
+	whatsappConn := api.Connection{
+		Platform:  "whatsapp",
+		Connected: false, // Default to false, would need backend call to get actual status
+		UserId:    userID,
 	}
+
+	apiConnections = append(apiConnections, whatsappConn)
 
 	response := api.ConnectionsResponse{
 		Connections: apiConnections,

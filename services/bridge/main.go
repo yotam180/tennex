@@ -13,14 +13,16 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
 	"github.com/tennex/bridge/db"
+	backendGRPC "github.com/tennex/bridge/internal/grpc"
 	"github.com/tennex/bridge/internal/handlers"
 	"github.com/tennex/bridge/whatsapp"
 	"github.com/tennex/shared/auth"
 )
 
 const (
-	DefaultJWTSecret = "dev-jwt-secret-change-in-production"
-	DefaultPort      = "6003"
+	DefaultJWTSecret       = "dev-jwt-secret-change-in-production"
+	DefaultPort            = "6003"
+	DefaultBackendGRPCAddr = "backend:6001" // Default for Docker, can be overridden
 )
 
 func min(a, b int) int {
@@ -60,9 +62,8 @@ func main() {
 	}
 	slog.Info("✅ Database connection established")
 
-	// Initialize WhatsApp connector
-	whatsappConnector := whatsapp.NewWhatsAppConnector(storage)
-	slog.Info("✅ WhatsApp connector initialized")
+	// Initialize WhatsApp connector (temporarily without backend client)
+	var whatsappConnector *whatsapp.WhatsAppConnector
 
 	// Initialize JWT configuration
 	jwtSecret := os.Getenv("JWT_SECRET")
@@ -81,8 +82,27 @@ func main() {
 	jwtConfig := auth.DefaultJWTConfig(jwtSecret)
 	slog.Info("✅ JWT authentication configured")
 
+	// Initialize backend gRPC client
+	backendAddr := os.Getenv("BACKEND_GRPC_ADDR")
+	if backendAddr == "" {
+		backendAddr = DefaultBackendGRPCAddr
+		slog.Info("Using default backend gRPC address", "addr", backendAddr)
+	}
+
+	backendClient, err := backendGRPC.NewBackendClient(backendAddr)
+	if err != nil {
+		slog.Error("Failed to initialize backend gRPC client", "error", err, "addr", backendAddr)
+		os.Exit(1)
+	}
+	defer backendClient.Close()
+	slog.Info("✅ Backend gRPC client connected", "addr", backendAddr)
+
+	// Initialize WhatsApp connector with backend client
+	whatsappConnector = whatsapp.NewWhatsAppConnector(storage, backendClient)
+	slog.Info("✅ WhatsApp connector initialized")
+
 	// Initialize handlers
-	whatsappHandler := handlers.NewWhatsAppHandler(storage, whatsappConnector)
+	whatsappHandler := handlers.NewWhatsAppHandler(storage, whatsappConnector, backendClient)
 	mainHandler := handlers.NewMainHandler(storage, whatsappHandler, jwtConfig)
 
 	// Setup HTTP router

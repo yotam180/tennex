@@ -3,6 +3,7 @@ module github.com/tennex/bridge
 go 1.24.0
 
 replace github.com/tennex/shared => ../../shared
+replace github.com/tennex/pkg => ../../pkg
 
 toolchain go1.24.6
 
@@ -14,8 +15,10 @@ require (
 	github.com/lib/pq v1.10.9
 	github.com/mdp/qrterminal/v3 v3.2.1
 	github.com/oapi-codegen/runtime v1.1.2
+	github.com/tennex/pkg v0.0.0-00010101000000-000000000000
 	github.com/tennex/shared v0.0.0-00010101000000-000000000000
 	go.mau.fi/whatsmeow v0.0.0-20250919124702-c8bdfd36d05e
+	google.golang.org/grpc v1.69.4
 	google.golang.org/protobuf v1.36.9
 	gorm.io/driver/postgres v1.6.0
 	gorm.io/gorm v1.31.0

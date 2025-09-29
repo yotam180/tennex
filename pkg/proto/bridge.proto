@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package tennex.bridge.v1;
 
-option go_package = "github.com/tennex/pkg/proto/gen/bridge/v1;bridgev1";
+option go_package = "github.com/tennex/pkg/proto/gen/pkg/proto;bridgev1";
 
 import "google/protobuf/timestamp.proto";
 

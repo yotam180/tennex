@@ -12,6 +12,7 @@ import (
 	"github.com/google/uuid"
 	api "github.com/tennex/bridge/api/gen"
 	"github.com/tennex/bridge/db"
+	backendGRPC "github.com/tennex/bridge/internal/grpc"
 	"github.com/tennex/bridge/whatsapp"
 	"github.com/tennex/shared/auth"
 )
@@ -19,12 +20,14 @@ import (
 type WhatsAppHandler struct {
 	storage           *db.Storage
 	whatsappConnector *whatsapp.WhatsAppConnector
+	backendClient     *backendGRPC.BackendClient
 }
 
-func NewWhatsAppHandler(storage *db.Storage, whatsappConnector *whatsapp.WhatsAppConnector) *WhatsAppHandler {
+func NewWhatsAppHandler(storage *db.Storage, whatsappConnector *whatsapp.WhatsAppConnector, backendClient *backendGRPC.BackendClient) *WhatsAppHandler {
 	return &WhatsAppHandler{
 		storage:           storage,
 		whatsappConnector: whatsappConnector,
+		backendClient:     backendClient,
 	}
 }
 
@@ -77,21 +80,6 @@ func (h *WhatsAppHandler) ConnectWhatsApp(w http.ResponseWriter, r *http.Request
 	}
 
 	fmt.Printf("🔐 User %s requesting WhatsApp connection\n", userID)
-
-	// Check if user already has a WhatsApp connection
-	existingJID, err := h.storage.GetJIDForAccount(r.Context(), userIDStr)
-	if err != nil {
-		h.writeError(w, http.StatusInternalServerError, "database_error", "Failed to check existing connections", nil)
-		return
-	}
-
-	if existingJID != "" {
-		fmt.Printf("⚠️  User %s already has WhatsApp connection: %s\n", userID, existingJID)
-		h.writeError(w, http.StatusConflict, "already_connected", "WhatsApp account already connected", map[string]interface{}{
-			"existing_jid": existingJID,
-		})
-		return
-	}
 
 	// Create QR channel for this connection attempt
 	qrChan := make(chan whatsapp.QRCodeData, 1)
@@ -149,21 +137,11 @@ func (h *WhatsAppHandler) GetWhatsAppStatus(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	// Check WhatsApp connection
-	whatsappJID, err := h.storage.GetJIDForAccount(r.Context(), userIDStr)
-	if err != nil {
-		h.writeError(w, http.StatusInternalServerError, "database_error", "Failed to check WhatsApp connection", nil)
-		return
-	}
-
+	// TODO: Check WhatsApp connection status from backend
+	// For now, returning disconnected status - should call backend to get actual status
 	response := api.WhatsAppStatusResponse{
-		Connected: whatsappJID != "",
+		Connected: false,
 		UserId:    userID,
-	}
-
-	if whatsappJID != "" {
-		response.WhatsappJid = &whatsappJID
-		// TODO: Add display_name, avatar_url, connected_at, last_seen when available
 	}
 
 	fmt.Printf("📊 WhatsApp status for user %s: connected=%v\n", userID, response.Connected)
@@ -185,10 +163,10 @@ func (h *WhatsAppHandler) DisconnectWhatsApp(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	// Remove WhatsApp connection
-	if err := h.storage.DeleteAccountConnection(r.Context(), userIDStr, "whatsapp"); err != nil {
-		h.writeError(w, http.StatusInternalServerError, "database_error", "Failed to disconnect WhatsApp", nil)
-		return
+	// Notify backend about WhatsApp disconnection
+	if err := h.backendClient.UpdateAccountDisconnected(r.Context(), userIDStr); err != nil {
+		fmt.Printf("⚠️  Failed to notify backend of WhatsApp disconnection: %v\n", err)
+		// Continue anyway - don't fail the API call for this
 	}
 
 	fmt.Printf("🔌 WhatsApp disconnected for user %s\n", userID)
