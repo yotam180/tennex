@@ -1,21 +1,23 @@
-import { useState } from 'react';
+import QRCode from 'react-qr-code';
+import { useState, useEffect } from 'react';
+
 import {
   Box,
   Card,
   Grid,
-  Button,
-  Typography,
-  CardContent,
-  CircularProgress,
   Alert,
   Paper,
-  LinearProgress,
+  Button,
   Divider,
+  Typography,
+  CardContent,
+  LinearProgress,
+  CircularProgress,
 } from '@mui/material';
-import QRCode from 'react-qr-code';
 
-import { DashboardContent } from 'src/layouts/dashboard';
 import axios from 'src/lib/axios';
+import { DashboardContent } from 'src/layouts/dashboard';
+
 import { Iconify } from 'src/components/iconify';
 
 // ----------------------------------------------------------------------
@@ -34,6 +36,14 @@ interface SyncProgress {
   message: string;
 }
 
+interface DatabaseStats {
+  path: string;
+  size: number;
+  conversations: number;
+  messages: number;
+  contacts: number;
+}
+
 export function WhatsAppSyncView() {
   const [loading, setLoading] = useState(false);
   const [qrData, setQrData] = useState<QRResponse | null>(null);
@@ -43,6 +53,22 @@ export function WhatsAppSyncView() {
   const [syncing, setSyncing] = useState(false);
   const [syncProgress, setSyncProgress] = useState<SyncProgress | null>(null);
   const [syncSuccess, setSyncSuccess] = useState(false);
+
+  // Database stats
+  const [dbStats, setDbStats] = useState<DatabaseStats | null>(null);
+
+  // Load database stats on mount
+  useEffect(() => {
+    const loadStats = async () => {
+      try {
+        const stats = await window.electronDB.getStats();
+        setDbStats(stats);
+      } catch (err) {
+        console.error('Failed to load database stats:', err);
+      }
+    };
+    loadStats();
+  }, []);
 
   const handleConnectWhatsApp = async () => {
     setLoading(true);
@@ -104,8 +130,11 @@ export function WhatsAppSyncView() {
         const data = response.data;
         totalConversations += data.conversations.length;
 
-        // TODO: Store conversations in local SQLite database
-        console.log(`📥 Received ${data.conversations.length} conversations`);
+        // Store conversations in local SQLite database
+        if (data.conversations.length > 0) {
+          await window.electronDB.upsertConversations(data.conversations);
+          console.log(`💾 Stored ${data.conversations.length} conversations in SQLite`);
+        }
 
         conversationSeq = data.latest_seq;
         hasMore = data.has_more;
@@ -140,8 +169,11 @@ export function WhatsAppSyncView() {
         const data = response.data;
         totalMessages += data.messages.length;
 
-        // TODO: Store messages in local SQLite database
-        console.log(`📥 Received ${data.messages.length} messages`);
+        // Store messages in local SQLite database
+        if (data.messages.length > 0) {
+          await window.electronDB.upsertMessages(data.messages);
+          console.log(`💾 Stored ${data.messages.length} messages in SQLite`);
+        }
 
         messageSeq = data.latest_seq;
         hasMore = data.has_more;
@@ -176,8 +208,11 @@ export function WhatsAppSyncView() {
         const data = response.data;
         totalContacts += data.contacts.length;
 
-        // TODO: Store contacts in local SQLite database
-        console.log(`📥 Received ${data.contacts.length} contacts`);
+        // Store contacts in local SQLite database
+        if (data.contacts.length > 0) {
+          await window.electronDB.upsertContacts(data.contacts);
+          console.log(`💾 Stored ${data.contacts.length} contacts in SQLite`);
+        }
 
         contactSeq = data.latest_seq;
         hasMore = data.has_more;
@@ -191,6 +226,19 @@ export function WhatsAppSyncView() {
       }
 
       console.log(`✅ Synced ${totalContacts} contacts`);
+
+      // Update sync state in SQLite
+      await window.electronDB.upsertSyncState({
+        integrationId,
+        lastConvSeq: conversationSeq,
+        lastMessageSeq: messageSeq,
+        lastContactSeq: contactSeq,
+      });
+
+      // Get database stats
+      const stats = await window.electronDB.getStats();
+      setDbStats(stats);
+      console.log('📊 Database stats:', stats);
 
       // Complete!
       setSyncProgress({
@@ -216,6 +264,68 @@ export function WhatsAppSyncView() {
       </Typography>
 
       <Grid container spacing={3}>
+        {/* Database Stats Section */}
+        {dbStats && (
+          <Grid size={{ xs: 12 }}>
+            <Card>
+              <CardContent>
+                <Typography variant="h6" gutterBottom>
+                  Local Database
+                </Typography>
+                <Grid container spacing={2}>
+                  <Grid size={{ xs: 6, sm: 3 }}>
+                    <Box>
+                      <Typography variant="h4" color="primary">
+                        {dbStats.conversations.toLocaleString()}
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        Conversations
+                      </Typography>
+                    </Box>
+                  </Grid>
+                  <Grid size={{ xs: 6, sm: 3 }}>
+                    <Box>
+                      <Typography variant="h4" color="primary">
+                        {dbStats.messages.toLocaleString()}
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        Messages
+                      </Typography>
+                    </Box>
+                  </Grid>
+                  <Grid size={{ xs: 6, sm: 3 }}>
+                    <Box>
+                      <Typography variant="h4" color="primary">
+                        {dbStats.contacts.toLocaleString()}
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        Contacts
+                      </Typography>
+                    </Box>
+                  </Grid>
+                  <Grid size={{ xs: 6, sm: 3 }}>
+                    <Box>
+                      <Typography variant="h4" color="primary">
+                        {(dbStats.size / 1024 / 1024).toFixed(2)} MB
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        Database Size
+                      </Typography>
+                    </Box>
+                  </Grid>
+                </Grid>
+                <Typography
+                  variant="caption"
+                  color="text.secondary"
+                  sx={{ mt: 2, display: 'block' }}
+                >
+                  Database location: {dbStats.path}
+                </Typography>
+              </CardContent>
+            </Card>
+          </Grid>
+        )}
+
         {/* Data Sync Section */}
         <Grid size={{ xs: 12 }}>
           <Card>
