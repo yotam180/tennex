@@ -1,0 +1,40 @@
+{
+  "editor.formatOnSave": true,
+  "editor.formatOnPaste": true,
+  "eslint.format.enable": true,
+  "[typescriptreact]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode",
+    "editor.indentSize": 2,
+    "editor.codeActionsOnSave": {
+      "source.unusedImports": "explicit",
+      "source.fixAll": "explicit"
+    }
+  },
+  "[typescript]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode",
+    "editor.indentSize": 2,
+    "editor.codeActionsOnSave": {
+      "source.unusedImports": "explicit",
+      "source.fixAll": "explicit"
+    }
+  },
+  "[javascript]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode",
+    "editor.indentSize": 2,
+    "editor.codeActionsOnSave": {
+      "source.unusedImports": "explicit",
+      "source.fixAll": "explicit"
+    }
+  },
+  "[javascriptreact]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode",
+    "editor.indentSize": 2,
+    "editor.codeActionsOnSave": {
+      "source.unusedImports": "explicit",
+      "source.fixAll": "explicit"
+    }
+  },
+  "[yaml]": {
+    "editor.formatOnSave": false
+  }
+}
