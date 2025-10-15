@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -127,8 +128,22 @@ func loadConfig() (*Config, error) {
 	}
 
 	// Load from environment (TENNEX_EVENTSTREAM_ prefix)
+	// Map env like TENNEX_EVENTSTREAM_NATS_URL -> nats.url
 	if err := k.Load(env.Provider("TENNEX_EVENTSTREAM_", ".", func(s string) string {
-		return s[18:] // Remove TENNEX_EVENTSTREAM_ prefix
+		key := s[18:] // Remove TENNEX_EVENTSTREAM_ prefix
+		key = strings.ToLower(key)
+		key = strings.ReplaceAll(key, "_", ".")
+		return key
+	}), nil); err != nil {
+		return nil, fmt.Errorf("error loading env config: %w", err)
+	}
+
+	// Also support generic TENNEX_ prefix to align with docker-compose
+	if err := k.Load(env.Provider("TENNEX_", ".", func(s string) string {
+		key := s[7:]
+		key = strings.ToLower(key)
+		key = strings.ReplaceAll(key, "_", ".")
+		return key
 	}), nil); err != nil {
 		return nil, fmt.Errorf("error loading env config: %w", err)
 	}
